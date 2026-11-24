@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 票据卡的几何参数，全部对齐 Flutter 原版 `MemberTicketCard`：
 /// 头像 80、头像与卡面缺口间隙 6、缺口倒角 8、卡面圆角 28。

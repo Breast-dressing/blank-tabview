@@ -14,7 +14,7 @@ enum RemoteImageLoader {
         if text.isEmpty { return "" }
         if text.hasPrefix("//") { text = "https:" + text }
         if text.hasPrefix("http://") {
-            text = "https://" + text.dropFirst("http://".count)
+            text = "https://" + String(text.dropFirst("http://".count))
         }
         return text
     }
