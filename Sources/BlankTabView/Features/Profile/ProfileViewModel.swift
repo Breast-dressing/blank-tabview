@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 /// 「我的」页的状态机：选中成员 → 补全成员资料 → 拉指标 → 荣誉分组；不依赖 UI。
+/// 选中 ID 一律经 `MemberId.canonical` 归一化，与磁盘里的成员资料 key 保持一致。
 @MainActor
 final class ProfileViewModel: ObservableObject {
     private let services = AppServices.shared
@@ -17,15 +18,20 @@ final class ProfileViewModel: ObservableObject {
 
     func load(force: Bool = false) async {
         families = services.families.families
-        let raw = services.store.selectedMemberId
-        var resolved = (raw?.isEmpty == false) ? raw : nil
+        var resolved = services.store.selectedMemberId.flatMap { raw -> String? in
+            let canonical = MemberId.canonical(raw)
+            return canonical.isEmpty ? nil : canonical
+        }
 
         // 没手动选过成员时，若仅有一个家族成员就自动选上，避免“我的”页空白
         if resolved == nil {
             let cached = services.families.allMembersCached()
-            if cached.count == 1, !cached[0].member.itemId.isEmpty {
-                services.store.setSelectedMember(cached[0].member.itemId)
-                resolved = cached[0].member.itemId
+            if cached.count == 1 {
+                let canonical = MemberId.canonical(cached[0].member.itemId)
+                if !canonical.isEmpty {
+                    services.store.setSelectedMember(canonical)
+                    resolved = canonical
+                }
             }
         }
 

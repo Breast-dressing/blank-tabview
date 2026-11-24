@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 /// 设置页逻辑：家族增删 / 排序、成员下拉、保存并刷新。
+/// 成员 ID 一律经 `MemberId.canonical` 归一化，落盘后才能被「我的」页命中。
 @MainActor
 final class SettingsViewModel: ObservableObject {
     private let services = AppServices.shared
@@ -17,8 +18,10 @@ final class SettingsViewModel: ObservableObject {
 
     func load() async {
         families = services.families.families
-        let raw = services.store.selectedMemberId
-        selectedId = (raw?.isEmpty == false) ? raw : nil
+        selectedId = services.store.selectedMemberId.flatMap { raw -> String? in
+            let canonical = MemberId.canonical(raw)
+            return canonical.isEmpty ? nil : canonical
+        }
         await refreshMembers()
     }
 
@@ -26,8 +29,13 @@ final class SettingsViewModel: ObservableObject {
         loadingMembers = true
         members = await services.families.allMembers()
         loadingMembers = false
+        if let selected = selectedId,
+           !members.contains(where: { MemberId.matches($0.member.itemId, selected) }) {
+            selectedId = nil
+        }
         if selectedId == nil, let first = members.first {
-            selectedId = first.member.itemId
+            let canonical = MemberId.canonical(first.member.itemId)
+            if !canonical.isEmpty { selectedId = canonical }
         }
     }
 
@@ -69,7 +77,7 @@ final class SettingsViewModel: ObservableObject {
 
     func saveMember() {
         guard let selectedId, !selectedId.isEmpty else { return }
-        services.store.setSelectedMember(selectedId)
+        services.store.setSelectedMember(MemberId.canonical(selectedId))
         services.metrics.invalidate()
     }
 }

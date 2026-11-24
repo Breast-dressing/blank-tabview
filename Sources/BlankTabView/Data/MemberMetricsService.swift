@@ -62,10 +62,10 @@ final class MemberMetricsService: @unchecked Sendable {
         let repo = families
         for family in repo.families {
             var members = (try? await repo.loadMembers(family)) ?? []
-            if !members.contains(where: { MemberId.matches($0.memberId, canonical) }) {
+            if !members.contains(where: { MemberId.matches($0.itemId, canonical) }) {
                 members = (try? await repo.loadMembers(family, force: true)) ?? members
             }
-            if let hit = members.first(where: { MemberId.matches($0.memberId, canonical) }) {
+            if let hit = members.first(where: { MemberId.matches($0.itemId, canonical) }) {
                 var member = hit
                 member.itemId = canonical
                 store.saveMemberInfo(member, familyId: family.id)
@@ -161,7 +161,7 @@ final class MemberMetricsService: @unchecked Sendable {
         if let components = URLComponents(string: url),
            let value = components.queryItems?.first(where: { $0.name == name })?.value,
            !value.isEmpty {
-            return value
+            return MemberId.canonical(value)
         }
         let pattern = "\(name)=([^&]*)"
         if let regex = try? NSRegularExpression(pattern: pattern),
