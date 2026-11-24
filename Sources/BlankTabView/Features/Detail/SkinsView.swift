@@ -121,6 +121,7 @@ struct SkinsView: View {
     @StateObject private var model: SkinsModel
     @State private var selectedSkin: SkinItem?
     @State private var selectedSeries = ""
+    @State private var pendingSeries: ProfileDestination?
     @Namespace private var zoomNS
 
     init(memberId: String, medalId: String, medalName: String, scheme: String) {
@@ -139,9 +140,10 @@ struct SkinsView: View {
                     count: "\(model.displayTotal)",
                     unit: "款"
                 )
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowInsets(EdgeInsets())
+                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
+                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
             }
-            .listRowBackground(Color.clear)
 
             if model.groups.isEmpty {
                 stateRow
@@ -156,12 +158,14 @@ struct SkinsView: View {
                                 .font(.system(size: 14))
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
-                            // 只有箭头可点：整行不再响应点击。
-                            NavigationLink(value: route(for: group)) {
+                            // 只有箭头这个按钮可点：整行不再响应点击。
+                            Button {
+                                pendingSeries = route(for: group)
+                            } label: {
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                    .frame(width: 44, height: 44, alignment: .trailing)
+                                    .frame(width: 30, height: 28, alignment: .trailing)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -188,6 +192,14 @@ struct SkinsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .onDisappear { model.stop() }
+        .navigationDestination(isPresented: Binding(
+            get: { pendingSeries != nil },
+            set: { if !$0 { pendingSeries = nil } }
+        )) {
+            if let route = pendingSeries {
+                pushDestination(route)
+            }
+        }
         .sheet(item: $selectedSkin) { skin in
             SkinDetailSheet(
                 skin: skin,
@@ -195,6 +207,16 @@ struct SkinsView: View {
                 uin: model.memberId,
                 zoomNamespace: zoomNS
             )
+        }
+    }
+
+    @ViewBuilder
+    private func pushDestination(_ route: ProfileDestination) -> some View {
+        switch route {
+        case let .skinSeries(member, artistName, seriesName, skins):
+            SkinSeriesView(member: member, artistName: artistName, seriesName: seriesName, skins: skins)
+        default:
+            EmptyView()
         }
     }
 

@@ -3,13 +3,16 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（内容不滚动、高度贴合内容、禁用液态玻璃、隐藏抓手）。
-/// 图片贴着工具栏、文本贴着图片底部，左右与底部留白一致。
+/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、禁用液态玻璃、隐藏抓手）。
+/// 图片贴着工具栏、文本贴着图片底部，左 / 右 / 底部留白一致。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
     let uin: String
     var zoomNamespace: Namespace.ID? = nil
+
+    /// 工具栏 44 + 图片 280 + 间距 8 + 两行文本 42 + 底部边距 20（与左边距一致）。
+    static let sheetHeight: CGFloat = 44 + 280 + 8 + 42 + 20
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -47,7 +50,8 @@ struct SkinDetailSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxHeight: .infinity, alignment: .top)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -66,8 +70,7 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 内容高度就是弹窗高度，底部不留空白。
-        .presentationSizing(.fitted)
+        .presentationDetents([.height(SkinDetailSheet.sheetHeight)])
         .presentationDragIndicator(.hidden)
         // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
         .presentationBackground(Color(uiColor: .systemGroupedBackground))
