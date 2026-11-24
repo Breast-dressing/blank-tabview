@@ -128,10 +128,10 @@ struct MedalsHallView: View {
                     title: model.member.title,
                     pic: model.member.pic,
                     subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
-                    count: "\(model.medalUnlocked)/\(model.medalTotal)",
+                    count: "\(model.medalUnlocked)",
                     unit: "枚"
                 )
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
 
                 if model.tabs.count > 1 {
                     PillTabsView(

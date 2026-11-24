@@ -122,10 +122,10 @@ struct MedalModuleView: View {
                     title: model.member.title,
                     pic: model.member.pic,
                     subtitle: headerSubtitle,
-                    count: "\(unlockedCount)/\(model.items.count)",
+                    count: "\(unlockedCount)",
                     unit: "枚"
                 )
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
             .listRowBackground(Color.clear)
 
