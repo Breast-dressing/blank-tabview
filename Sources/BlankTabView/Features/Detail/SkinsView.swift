@@ -139,7 +139,7 @@ struct SkinsView: View {
                     count: "\(model.displayTotal)",
                     unit: "款"
                 )
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
             .listRowBackground(Color.clear)
 
@@ -148,16 +148,23 @@ struct SkinsView: View {
             } else {
                 ForEach(model.groups) { group in
                     Section {
-                        NavigationLink(value: route(for: group)) {
-                            HStack(spacing: 6) {
-                                Text(group.name)
-                                    .font(.system(size: 16, weight: .semibold))
-                                Spacer(minLength: 8)
-                                Text("\(group.unlockedCount)/\(group.skins.count)")
-                                    .font(.system(size: 14))
-                                    .monospacedDigit()
+                        HStack(spacing: 6) {
+                            Text(group.name)
+                                .font(.system(size: 16, weight: .semibold))
+                            Spacer(minLength: 8)
+                            Text("\(group.unlockedCount)/\(group.skins.count)")
+                                .font(.system(size: 14))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            // 只有箭头可点：整行不再响应点击。
+                            NavigationLink(value: route(for: group)) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.secondary)
+                                    .frame(width: 44, height: 44, alignment: .trailing)
+                                    .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
                         .listRowSeparator(.hidden)
 
