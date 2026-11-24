@@ -59,11 +59,15 @@ enum Fmt {
         return f.string(from: date)
     }
 
+    /// 荣誉记录的时间：中文格式优先，其次常见 ISO / 短横线格式。
     static func parseHonorDate(_ raw: String) -> Date? {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+
         let pattern = "(\\d{4})年(\\d{1,2})月(\\d{1,2})日(?:[\\sT]+(\\d{1,2}):(\\d{2}))?"
         if let regex = try? NSRegularExpression(pattern: pattern),
-           let match = regex.firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)) {
-            let ns = raw as NSString
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+            let ns = text as NSString
             let year = Int(ns.substring(with: match.range(at: 1))) ?? 0
             let month = Int(ns.substring(with: match.range(at: 2))) ?? 1
             let day = Int(ns.substring(with: match.range(at: 3))) ?? 1
@@ -79,20 +83,34 @@ enum Fmt {
             components.day = day
             components.hour = hour
             components.minute = minute
-            return Calendar.current.date(from: components)
+            if let date = Calendar.current.date(from: components) { return date }
         }
+
         let iso = ISO8601DateFormatter()
-        if let date = iso.date(from: raw.trimmingCharacters(in: .whitespacesAndNewlines)) { return date }
-        let fallback = DateFormatter()
-        fallback.locale = Locale(identifier: "en_US_POSIX")
-        fallback.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return fallback.date(from: raw.trimmingCharacters(in: .whitespacesAndNewlines))
+        if let date = iso.date(from: text) { return date }
+
+        let patterns = [
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm",
+            "yyyy-MM-dd",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd HH:mm",
+            "yyyy/MM/dd"
+        ]
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        for format in patterns {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: text) { return date }
+        }
+        return nil
     }
 
     /// 记录所属日期 key：2025年11月20日 / 2025-11-20
     static func dateKey(_ raw: String) -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let pattern = "(?:^\u{FEFF})?(\\d{4}年\\d{1,2}月\\d{1,2}日|\\d{4}-\\d{2}-\\d{2})"
+        let pattern = "(\\d{4}年\\d{1,2}月\\d{1,2}日|\\d{4}-\\d{2}-\\d{2})"
         if let regex = try? NSRegularExpression(pattern: pattern),
            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
             return (text as NSString).substring(with: match.range(at: 1))
