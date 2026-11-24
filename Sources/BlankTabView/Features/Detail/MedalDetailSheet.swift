@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// 勋章详情（sheet）：同一勖章的各级别大图，可左右翻页。
+/// 勋章详情（sheet）：同一勋章的各级别大图，可左右翻页。
 struct MedalDetailSheet: View {
     let memberId: String
     let target: MedalSheetTarget
+    var zoomNamespace: Namespace.ID? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var levels: [MedalLevel] = []
@@ -45,7 +46,8 @@ struct MedalDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium])
+        .zoomNavigationTransitionIfAvailable(id: target.medalId, in: zoomNamespace)
         .task { await load() }
     }
 

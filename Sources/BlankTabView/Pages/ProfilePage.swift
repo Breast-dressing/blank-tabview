@@ -65,8 +65,8 @@ struct ProfilePage: View {
             MedalModuleView(memberId: memberId, moduleId: moduleId, moduleName: moduleName, tabName: tabName)
         case let .skins(memberId, medalId, medalName, scheme):
             SkinsView(memberId: memberId, medalId: medalId, medalName: medalName, scheme: scheme)
-        case let .skinSeries(seriesName, skins):
-            SkinSeriesView(seriesName: seriesName, skins: skins)
+        case let .skinSeries(member, artistName, seriesName, skins):
+            SkinSeriesView(member: member, artistName: artistName, seriesName: seriesName, skins: skins)
         case let .family(family):
             FamilyDetailView(family: family)
         case let .member(memberId):
