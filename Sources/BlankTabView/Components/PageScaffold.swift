@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 统一页面骨架：标题用系统大标题（左上角，Apple Music 那种），内容直接接在标题下方。
+/// 统一页面骨架：标题在顶部栏内左侧、大字号、纯文字（不是按钮，不是居中 inline 小标题）。
 struct PageScaffold<Content: View>: View {
     let title: String
     let background: Color
@@ -31,8 +31,17 @@ struct PageScaffold<Content: View>: View {
             }
         }
         .background(background.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Text(title)
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
     }
 
     private var stack: some View {
@@ -43,7 +52,7 @@ struct PageScaffold<Content: View>: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 0)
+        .padding(.top, 4)
         .padding(.bottom, scroll ? 24 : 0)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(maxHeight: scroll ? nil : .infinity, alignment: .topLeading)

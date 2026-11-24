@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 皮肤扫描的“页面还在”标志。
 final class ScanFlag: @unchecked Sendable {
@@ -177,29 +178,36 @@ struct SkinsView: View {
     }
 }
 
-/// 皮肤小格：大图 + 名称 + 序号。
+/// 皮肤卡：大圆角卡片，直接展示接口给的 `pic`，不铺任何底色；
+/// 加载中在整张卡片中心显示系统 `ProgressView`（官方转圈），无淡入 / 缩放等动画。
 struct SkinTileCell: View {
     let skin: SkinItem
+    @State private var image: UIImage?
+
+    /// 卡片大圆角
+    private let radius: CGFloat = 24
+    private var corner: RoundedRectangle {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+    }
 
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(uiColor: .tertiarySystemFill))
-                if let url = URL(string: skin.pic), !skin.pic.isEmpty {
-                    AsyncImage(url: url) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFit()
-                        } else {
-                            placeholder
-                        }
-                    }
-                    .padding(4)
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
                 } else {
-                    placeholder
+                    ProgressView()
                 }
             }
-            .frame(height: 74)
+            .frame(maxWidth: .infinity)
+            .frame(height: 86)
+            .clipShape(corner)
+            .contentShape(corner)
+            .task(id: skin.pic) {
+                image = await RemoteImageLoader.image(for: skin.pic)
+            }
 
             Text(skin.name)
                 .font(.system(size: 12, weight: .medium))
@@ -213,12 +221,6 @@ struct SkinTileCell: View {
                     .lineLimit(1)
             }
         }
-    }
-
-    private var placeholder: some View {
-        Image(systemName: "sparkles")
-            .font(.system(size: 18))
-            .foregroundStyle(.secondary)
     }
 }
 
