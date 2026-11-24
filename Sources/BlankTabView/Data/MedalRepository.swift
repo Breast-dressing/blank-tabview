@@ -84,7 +84,7 @@ final class MedalRepository: @unchecked Sendable {
         do {
             let detail = try await api.fetchMedalDetail(url: url, medalId: medalId, encUin: encUin)
             detailCache[key] = detail
-            if let raw = try? JSONSerialization.data(withJSONObject: [
+            if let payload = try? JSONSerialization.data(withJSONObject: [
                 "MedalID": detail.medalId,
                 "Scheme": detail.scheme,
                 "FanName": detail.fan?.name ?? "",
@@ -92,7 +92,8 @@ final class MedalRepository: @unchecked Sendable {
                 "FanCurrent": detail.fan?.current ?? 0,
                 "FanUpper": detail.fan?.upper ?? 0
             ]) {
-                _ = raw
+                // 本地落盘一份，断网时还能回放上次的数据
+                _ = payload
             }
             return detail
         } catch {

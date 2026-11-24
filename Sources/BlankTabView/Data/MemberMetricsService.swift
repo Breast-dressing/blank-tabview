@@ -92,24 +92,22 @@ final class MemberMetricsService: @unchecked Sendable {
         metrics.skinMedalScheme = medal.scheme
         metrics.rankScheme = medal.scheme
 
-        async let ranksTask = loadRanks(scheme: medal.scheme, itemId: itemId)
-        async let skinTask = loadSkin(medalId: medalId, encUin: encUin.isEmpty ? itemId : encUin)
-        async let fanTask = loadFan(hallURL: hallURL, medalId: medalId, encUin: encUin)
+        async let ranks = loadRanks(scheme: medal.scheme, itemId: itemId)
+        async let skinTotal = loadSkin(medalId: medalId, encUin: encUin.isEmpty ? itemId : encUin)
+        async let fan = loadFan(hallURL: hallURL, medalId: medalId, encUin: encUin)
 
-        let ranks = try? await ranksTask
-        let skin = try? await skinTask
-        let fan = try? await fanTask
-
-        if let ranks {
-            metrics.weekRank = ranks.week
-            metrics.monthRank = ranks.month
-            metrics.weekTabName = ranks.weekName
-            metrics.monthTabName = ranks.monthName
+        if let summary = try? await ranks {
+            metrics.weekRank = summary.week
+            metrics.monthRank = summary.month
+            metrics.weekTabName = summary.weekName
+            metrics.monthTabName = summary.monthName
         }
-        if let skin, let total = skin {
-            metrics.skinCount = total
+        if let count = try? await skinTotal {
+            metrics.skinCount = count
         }
-        metrics.fan = fan ?? nil
+        if let medalFan = try? await fan {
+            metrics.fan = medalFan
+        }
         return metrics
     }
 

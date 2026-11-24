@@ -52,7 +52,7 @@ final class FamilyRepository: @unchecked Sendable {
         return text
     }
 
-    // MARK: - 解析
+    // MARK: - 家族列表
 
     @discardableResult
     func add(_ raw: String) async throws -> [Family] {
@@ -72,11 +72,7 @@ final class FamilyRepository: @unchecked Sendable {
         inflight[removed.id] = nil
         store.clearFamilyMembers(removed.id)
         store.saveFamilies(cache)
-        if store.selectedMemberId == nil || memberCache.isEmpty {
-            // 选中成员被删掉时，让上层重新选择
-            let stillThere = allMembersCached().contains { $0.member.itemId == store.selectedMemberId }
-            if !stillThere && cache.isEmpty { store.setSelectedMember("") }
-        }
+        if store.selectedMemberId == removed.id { store.setSelectedMember("") }
         return cache
     }
 
@@ -95,6 +91,8 @@ final class FamilyRepository: @unchecked Sendable {
         store.saveFamilies(cache)
         return cache
     }
+
+    // MARK: - 解析家族页
 
     func parse(from url: String) async throws -> Family {
         let html = try await api.fetchHtml(url)
@@ -119,14 +117,12 @@ final class FamilyRepository: @unchecked Sendable {
         var avatar = QqApi.str(data["Avatar"])
         if avatar.isEmpty { avatar = QqApi.str(data["Pic"]) }
 
-        if name.isEmpty, familyId != QqApi.str(QqApi.map(ssr["query"])["family_id"]) || name.isEmpty {
-            // 部分链接只给了 family_id，用 i2 家族页补齐名称等字段
-            let detailUrl = "https://i2.y.qq.com/?family_id=\(familyId)"
-            if let detailHtml = try? await api.fetchHtml(detailUrl),
+        if name.isEmpty {
+            // 部分分享链接只带了 family_id，补一次 i2 家族页拿名称 / 头像
+            let detailURL = "https://i2.y.qq.com/?family_id=\(familyId)"
+            if let detailHtml = try? await api.fetchHtml(detailURL),
                let detailSsr = QqApi.extractSsr(detailHtml) {
-                let detail = QqApi.map(QqApi.map(detailSsr["data"])["data"]).isEmpty
-                    ? QqApi.map(QqApi.map(detailSsr["data"])["data"])
-                    : QqApi.map(detailSsr["data"])
+                let detail = QqApi.map(QqApi.map(detailSsr["data"])["data"])
                 if name.isEmpty { name = QqApi.str(detail["Name"]) }
                 if avatar.isEmpty { avatar = QqApi.str(detail["Avatar"]) }
             }
@@ -135,7 +131,7 @@ final class FamilyRepository: @unchecked Sendable {
         var honor = "0"
         var rank = "--"
         var pkWin = "--"
-        var members = "0"
+        var memberCount = "0"
         for item in QqApi.list(data["DetailItemList"]) {
             let desc = QqApi.str(item["Desc"])
             let title = QqApi.str(item["Title"])
@@ -146,7 +142,7 @@ final class FamilyRepository: @unchecked Sendable {
             } else if desc.contains("PK") || desc.contains("胜场") {
                 pkWin = title.isEmpty ? "--" : title
             } else if desc.contains("成员") {
-                members = digits(title, fallback: "0")
+                memberCount = digits(title, fallback: "0")
             }
         }
 
@@ -158,7 +154,7 @@ final class FamilyRepository: @unchecked Sendable {
             honor: honor,
             rank: rank,
             pkWin: pkWin,
-            members: members,
+            members: memberCount,
             weekHonor: nil,
             rawUrl: url
         )
