@@ -150,23 +150,24 @@ struct SkinsView: View {
         }
     }
 
-    /// 头部直接铺在页面里（不套卡片）：通话列表尺寸的头像 + 名字 / 勋章名 + 右侧皮肤数量。
+    /// 头部直接铺在页面里（不套卡片）：48 头像 + 名字 / 勋章名 + 右侧皮肤数量。
+    /// 名字与数量字号沿用「我的」卡片的字重（bold）。
     private var skinHeader: some View {
         HStack(alignment: .center, spacing: 10) {
-            AvatarCircle(urlString: model.member.pic, size: 34)
+            AvatarCircle(urlString: model.member.pic, size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.member.title.isEmpty ? "未知成员" : model.member.title)
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .bold))
                     .lineLimit(1)
                 Text(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .bold))
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text("\(model.total > 0 ? model.total : model.skins.count)")
-                        .font(.title3)
+                        .font(.system(size: 20, weight: .bold))
                     Text("款")
                         .font(.footnote)
                 }

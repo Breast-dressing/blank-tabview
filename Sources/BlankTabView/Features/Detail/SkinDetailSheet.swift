@@ -3,8 +3,8 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情（sheet）：大图 + 名称 + 全服解锁人数 + 右下角「获取日期｜限定编号」。
-/// 工具栏左上关闭、右上分享。弹窗高度随内容自适应。
+/// 单个皮肤详情：原生 sheet（system 标准半屏、隐藏抓手），左上关闭、右上分享。
+/// 内容：大图 → 名称 + 全服解锁人数 → 右下两行「限定编号（粗体）/ 获取日期」。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -24,39 +24,35 @@ struct SkinDetailSheet: View {
         URL(string: link) ?? URL(string: "https://y.qq.com")!
     }
 
-    /// 右下角一行：获取日期｜限定编号（缺一项时只显示另一项）。
-    private var metaText: String {
-        [skin.unlockedDate, skin.seqNo]
-            .filter { !$0.isEmpty }
-            .joined(separator: "｜")
-    }
-
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                imageView
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    imageView
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(skin.name)
-                        .font(.system(size: 19, weight: .bold))
-                    Text(skin.userCount > 0 ? "全服解锁 \(Fmt.thousands(skin.userCount)) 人" : "全服解锁人数 -")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(skin.name)
+                            .font(.system(size: 19, weight: .bold))
+                        Text(skin.userCount > 0 ? "全服解锁 \(Fmt.thousands(skin.userCount)) 人" : "全服解锁人数 -")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
 
-                HStack {
-                    Spacer(minLength: 0)
-                    Text(metaText.isEmpty ? "-" : metaText)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
+                            .font(.system(size: 15, weight: .bold))
+                        Text(skin.unlockedDate.isEmpty ? "-" : skin.unlockedDate)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                (Color(hex: skin.bgColor) ?? Color(uiColor: .systemGroupedBackground))
-                    .ignoresSafeArea()
-            )
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("皮肤详情")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -72,7 +68,8 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        .presentationSizing(.fitted)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
     }
 
     /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
