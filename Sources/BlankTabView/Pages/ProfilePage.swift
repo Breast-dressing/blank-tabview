@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 我的：系统大标题；工具栏右侧齿轮进设置。成员票据卡直接贴标题下方，不再自加间距。
+/// 我的：左上角大标题 + 右侧齿轮；成员票据卡直接贴标题下方。
 /// 票据卡四项数据与家族格可点进详情页（入口规则集中在 MemberEntries）。
 struct ProfilePage: View {
     @StateObject private var model = ProfileViewModel()
@@ -12,7 +12,16 @@ struct ProfilePage: View {
             PageScaffold(
                 title: AppTab.profile.title,
                 background: Color(uiColor: .systemGroupedBackground),
-                scroll: true
+                scroll: true,
+                trailing: {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .accessibilityLabel("设置")
+                }
             ) {
                 VStack(alignment: .leading, spacing: 16) {
                     cardSlot
@@ -31,16 +40,6 @@ struct ProfilePage: View {
                             action: { Task { await model.load(force: true) } }
                         )
                     }
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("设置")
                 }
             }
             .navigationDestination(for: ProfileDestination.self) { route in
@@ -86,6 +85,7 @@ struct ProfilePage: View {
                 weekHonor: { model.weekHonor(of: $0) },
                 onTapWeek: tap(MemberEntries.rank(metrics, monthly: false)),
                 onTapMonth: tap(MemberEntries.rank(metrics, monthly: true)),
+                onTapSkin: nil,
                 onTapSkins: tap(MemberEntries.skins(metrics)),
                 onTapMedals: tap(MemberEntries.medals(metrics)),
                 onTapFamily: { path.append(MemberEntries.family($0)) }
