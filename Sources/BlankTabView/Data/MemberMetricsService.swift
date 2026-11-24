@@ -8,7 +8,7 @@ struct RankSummary: Sendable {
 }
 
 /// 把一个成员的「周榜 / 月榜 / 乐迷皮肤 / 奖章 / 乐迷值 / 近 7 天荣誉」一次算清。
-/// 成员资料缺失时先去家族成员里补，不把“未知”展示给用户。
+/// 成员 ID 一律先过 `MemberId.canonical`，避免列表里的编码 ID 与主页链接里的解码 ID 对不上。
 final class MemberMetricsService: @unchecked Sendable {
     private let store: AppStore
     private let families: FamilyRepository
@@ -25,7 +25,7 @@ final class MemberMetricsService: @unchecked Sendable {
 
     func invalidate(_ itemId: String? = nil) {
         if let itemId {
-            cache[itemId] = nil
+            cache.removeValue(forKey: MemberId.canonical(itemId))
         } else {
             cache.removeAll()
         }
@@ -34,51 +34,60 @@ final class MemberMetricsService: @unchecked Sendable {
 
     /// 已算好的指标快照（详情页里只读，不触发网络）。
     func peek(_ itemId: String) -> MemberMetrics? {
-        cache[itemId]
+        cache[MemberId.canonical(itemId)]
     }
 
-    /// 本地缓存里的成员资料（勋章接口失败时仍能展示头像与名字）。
+    /// 本地成员资料（唯一查找入口）：磁盘 key、家族成员列表都按归一化 ID 比较。
     func cachedMember(_ itemId: String) -> Member? {
-        store.memberInfo(itemId)
-            ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member
+        let canonical = MemberId.canonical(itemId)
+        guard !canonical.isEmpty else { return nil }
+        if let hit = store.memberInfo(canonical), !hit.title.isEmpty, hit.title != "未知" {
+            return hit
+        }
+        if let hit = families.allMembersCached().first(where: { MemberId.matches($0.member.itemId, canonical) }) {
+            return hit.member
+        }
+        return nil
     }
 
-    /// 成员资料补全（唯一入口）：缓存 → 内存成员 → 逐个家族拉取。
-    /// 「我的」页与成员详情都走这里，不各写一份。
+    /// 成员资料补全（唯一入口）：磁盘缓存 → 家族成员（带盘缓存）→ 家族成员强制重拉。
+    /// 「我的」页、成员详情、成员列表都走这里。
     func ensureMember(_ itemId: String) async -> Member? {
-        guard !itemId.isEmpty else { return nil }
-        if let cached = cachedMember(itemId), !cached.title.isEmpty {
+        let canonical = MemberId.canonical(itemId)
+        guard !canonical.isEmpty else { return nil }
+        if let cached = cachedMember(canonical) {
             return cached
         }
 
         let repo = families
         for family in repo.families {
-            let members = (try? await repo.loadMembers(family)) ?? []
-            if let hit = members.first(where: { $0.itemId == itemId }) {
-                store.saveMemberInfo(hit, familyId: family.id)
-                return hit
+            var members = (try? await repo.loadMembers(family)) ?? []
+            if !members.contains(where: { MemberId.matches($0.memberId, canonical) }) {
+                members = (try? await repo.loadMembers(family, force: true)) ?? members
             }
-        }
-        for entry in repo.allMembersCached() where entry.member.itemId == itemId {
-            store.saveMemberInfo(entry.member, familyId: entry.family.id)
-            return entry.member
+            if let hit = members.first(where: { MemberId.matches($0.memberId, canonical) }) {
+                var member = hit
+                member.itemId = canonical
+                store.saveMemberInfo(member, familyId: family.id)
+                return member
+            }
         }
         return nil
     }
 
     func load(_ itemId: String, force: Bool = false) async throws -> MemberMetrics {
-        if !force, let cached = cache[itemId] { return cached }
+        let canonical = MemberId.canonical(itemId)
+        if !force, let cached = cache[canonical] { return cached }
         let metrics = try await AsyncTimeout.run(seconds: 45) { [self] in
-            try await build(itemId)
+            try await build(canonical)
         }
-        cache[itemId] = metrics
+        cache[canonical] = metrics
         return metrics
     }
 
     private func build(_ itemId: String) async throws -> MemberMetrics {
         let member: Member
-        if let cached = store.memberInfo(itemId)
-            ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member {
+        if let cached = cachedMember(itemId) {
             member = cached
         } else if let ensured = await ensureMember(itemId) {
             member = ensured
@@ -105,12 +114,10 @@ final class MemberMetricsService: @unchecked Sendable {
         }
         guard !artist.isEmpty else { return metrics }
 
-        // 找「乐迷」Tab（可能多个，取第一个有数据的）
         guard let tab = page.results.first(where: { result in
             result.tab.name.contains("乐迷") && result.success && !result.modules.isEmpty
         }) else { return metrics }
 
-        // 模块里按艺人名匹配：先精确，再包含
         var matched: MedalItem?
         for module in tab.modules {
             if let item = module.items.first(where: { $0.name == artist }) { matched = item; break }
@@ -161,7 +168,7 @@ final class MemberMetricsService: @unchecked Sendable {
            let match = regex.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)),
            match.numberOfRanges > 1 {
             let raw = (url as NSString).substring(with: match.range(at: 1))
-            return raw.removingPercentEncoding ?? raw
+            return MemberId.canonical(raw)
         }
         return ""
     }
@@ -182,7 +189,6 @@ final class MemberMetricsService: @unchecked Sendable {
             }
         }
 
-        // 首屏没命中的榜，逐个 Tab 懒加载补全
         if summary.week == nil || summary.month == nil {
             for tab in page.tabs {
                 let needWeek = summary.week == nil && tab.isWeek
@@ -207,10 +213,7 @@ final class MemberMetricsService: @unchecked Sendable {
     }
 
     private func matchedMember(_ items: [RankMember], itemId: String) -> RankMember? {
-        items.first { member in
-            let decoded = Fmt.decodeId(member.itemId)
-            return decoded == itemId || member.itemId == itemId
-        }
+        items.first { MemberId.matches($0.itemId, itemId) }
     }
 
     private func loadSkin(medalId: String, encUin: String) async throws -> Int? {

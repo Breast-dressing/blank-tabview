@@ -1,6 +1,7 @@
 import Foundation
 
 /// 本地持久化：键名与 Flutter / Node 版保持一致，便于旧数据迁移与排查。
+/// 成员 ID 统一经 `MemberId.canonical` 归一化后作为 key，旧版本落盘的编码形式会自动迁移。
 final class AppStore: @unchecked Sendable {
     static let medalUrlTemplate =
         "https://i2.y.qq.com/n3/client/pages/medal_collection_new/index.html"
@@ -65,37 +66,69 @@ final class AppStore: @unchecked Sendable {
 
     var selectedMemberId: String? {
         let url = defaults.string(forKey: Key.medalUrl) ?? ""
-        guard let range = url.range(of: "enc_uin=\\S*", options: .regularExpression) else { return nil }
-        let value = url[range].replacingOccurrences(of: "enc_uin=", with: "")
-        return value.removingPercentEncoding ?? value
+        guard let range = url.range(of: "enc_uin=[^&\\s]*", options: .regularExpression) else { return nil }
+        let value = String(url[range]).replacingOccurrences(of: "enc_uin=", with: "")
+        let canonical = MemberId.canonical(value)
+        return canonical.isEmpty ? nil : canonical
     }
 
     var medalUrl: String { defaults.string(forKey: Key.medalUrl) ?? "" }
 
     func setSelectedMember(_ itemId: String) {
-        let url = Self.medalUrlTemplate.replacingOccurrences(of: "{ENC_UIN}", with: itemId)
+        let canonical = MemberId.canonical(itemId)
+        guard !canonical.isEmpty else {
+            defaults.removeObject(forKey: Key.medalUrl)
+            return
+        }
+        let url = Self.medalUrlTemplate.replacingOccurrences(of: "{ENC_UIN}", with: canonical)
         defaults.set(url, forKey: Key.medalUrl)
     }
 
     func memberInfo(_ itemId: String) -> Member? {
-        guard let data = defaults.data(forKey: Key.memberInfoPrefix + itemId),
-              var member = try? JSONDecoder().decode(Member.self, from: data) else { return nil }
-        member.itemId = itemId
-        return member
+        let canonical = MemberId.canonical(itemId)
+        guard !canonical.isEmpty else { return nil }
+
+        if let data = defaults.data(forKey: Key.memberInfoPrefix + canonical),
+           var member = try? JSONDecoder().decode(Member.self, from: data) {
+            member.itemId = canonical
+            return member
+        }
+
+        // 旧版本可能把编码形式的 ID 作为 key 落盘：扫一遍前缀，命中后迁移到规范 key
+        for storedKey in defaults.dictionaryRepresentation().keys
+        where storedKey.hasPrefix(Key.memberInfoPrefix) {
+            let storedId = String(storedKey.dropFirst(Key.memberInfoPrefix.count))
+            guard MemberId.matches(storedId, canonical),
+                  let data = defaults.data(forKey: storedKey),
+                  var member = try? JSONDecoder().decode(Member.self, from: data) else { continue }
+            member.itemId = canonical
+            saveMemberInfo(member)
+            defaults.removeObject(forKey: storedKey)
+            return member
+        }
+        return nil
     }
 
     func saveMemberInfo(_ member: Member, familyId: String? = nil) {
-        if member.itemId.isEmpty { return }
-        let merged = member.with(familyId: familyId ?? member.familyId)
+        let canonical = MemberId.canonical(member.itemId)
+        guard !canonical.isEmpty else { return }
+        var merged = member.with(familyId: familyId ?? member.familyId)
+        merged.itemId = canonical
         if let data = try? JSONEncoder().encode(merged) {
-            defaults.set(data, forKey: Key.memberInfoPrefix + member.itemId)
+            defaults.set(data, forKey: Key.memberInfoPrefix + canonical)
         }
     }
 
     func familyMembers(_ familyId: String) -> [Member] {
         guard let data = defaults.data(forKey: Key.familyMembersPrefix + familyId),
               let list = try? JSONDecoder().decode([Member].self, from: data) else { return [] }
-        return list.filter { !$0.itemId.isEmpty }
+        return list
+            .filter { !$0.itemId.isEmpty }
+            .map { member in
+                var fixed = member
+                fixed.itemId = MemberId.canonical(member.itemId)
+                return fixed
+            }
     }
 
     func saveFamilyMembers(_ familyId: String, members: [Member]) {
