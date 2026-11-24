@@ -125,9 +125,10 @@ struct MedalModuleView: View {
                     count: "\(unlockedCount)",
                     unit: "枚"
                 )
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowInsets(EdgeInsets())
+                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
+                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
             }
-            .listRowBackground(Color.clear)
 
             if model.loading {
                 StateNotice(title: "正在读取模块…", progress: true)

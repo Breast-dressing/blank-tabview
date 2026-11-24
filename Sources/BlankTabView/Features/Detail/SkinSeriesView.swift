@@ -29,9 +29,10 @@ struct SkinSeriesView: View {
                     count: "\(unlockedCount)",
                     unit: "款"
                 )
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowInsets(EdgeInsets())
+                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
+                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
             }
-            .listRowBackground(Color.clear)
 
             Section {
                 if skins.isEmpty {
