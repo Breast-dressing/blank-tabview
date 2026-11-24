@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// 统一页面骨架：标题用导航栏自己的标题位（大标题），靠 `toolbarTitleAlignment(.leading)` 顶到左侧；
-/// 右侧动作走工具栏尾部。
+/// 统一页面骨架：标题用系统工具栏标题位（`inlineLarge` = 同一行内的大标题），
+/// 再用 `toolbarTitleAlignment(.leading)` 顶到左侧；右侧动作（齿轮等）在同一条工具栏里。
 struct PageScaffold<Content: View, Trailing: View>: View {
     let title: String
     let background: Color
@@ -36,7 +36,7 @@ struct PageScaffold<Content: View, Trailing: View>: View {
         }
         .background(background.ignoresSafeArea())
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .toolbarTitleDisplayMode(.inlineLarge)
         .toolbarTitleLeading()
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
@@ -54,7 +54,7 @@ struct PageScaffold<Content: View, Trailing: View>: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 0)
+        .padding(.top, 2)
         .padding(.bottom, scroll ? 24 : 0)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(maxHeight: scroll ? nil : .infinity, alignment: .topLeading)
