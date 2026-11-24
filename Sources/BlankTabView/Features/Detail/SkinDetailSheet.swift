@@ -11,6 +11,7 @@ struct SkinDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var copied = false
+    @State private var image: UIImage?
 
     private var link: String {
         let safeId = skin.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? skin.id
@@ -23,7 +24,7 @@ struct SkinDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    image
+                    imageView
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(skin.name)
@@ -100,23 +101,24 @@ struct SkinDetailSheet: View {
         .presentationDetents([.large])
     }
 
-    private var image: some View {
+    /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
+    private var imageView: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-            if let url = URL(string: skin.pic), !skin.pic.isEmpty {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit()
-                    } else {
-                        ProgressView()
-                    }
-                }
-                .padding(12)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ProgressView()
             }
         }
-        .frame(height: 260)
         .frame(maxWidth: .infinity)
+        .frame(height: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .task(id: skin.pic) {
+            image = await RemoteImageLoader.image(for: skin.pic)
+        }
     }
 }
 
