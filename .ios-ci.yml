@@ -1,0 +1,24 @@
+# ios-ci-workflows 配置（Xcode 27.2 / iOS 27.2 SDK）
+# 所有工作流都从这里读设置，入口文件里只剩触发条件与产物发布。
+workdir: .
+project: BlankTabView.xcodeproj
+scheme: BlankTabView
+bundle_id: com.breastdressing.blanktabview
+display_name: ''
+sync_command: 'true'
+generate_command: xcodegen generate
+icon_path: ''
+
+toolchain:
+  xcode: '27.2'
+  simulator: iPhone 18 Pro
+  ios: '27.2'
+
+build_test:
+  test_plan: ''
+  accessibility_audit: warn
+  commit_recorded_snapshots: false
+
+testflight:
+  entitlement_mode: none
+  acceptance_issue: false
