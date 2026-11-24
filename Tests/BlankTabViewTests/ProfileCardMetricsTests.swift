@@ -3,9 +3,11 @@ import XCTest
 
 final class ProfileCardMetricsTests: XCTestCase {
     func testLobeSurroundsAvatarWithRing() {
-        let lobes = ProfileCardMetrics.lobeDiameter
-        XCTAssertEqual(lobes, ProfileCardMetrics.avatarSize + ProfileCardMetrics.ringPadding * 2)
-        XCTAssertGreaterThan(lobes, ProfileCardMetrics.avatarSize)
+        XCTAssertEqual(
+            ProfileCardMetrics.lobeDiameter,
+            ProfileCardMetrics.avatarSize + ProfileCardMetrics.ringPadding * 2
+        )
+        XCTAssertGreaterThan(ProfileCardMetrics.lobeDiameter, ProfileCardMetrics.avatarSize)
     }
 
     func testLobeProtrudesBeyondCardCorner() {
@@ -13,7 +15,11 @@ final class ProfileCardMetricsTests: XCTestCase {
         XCTAssertGreaterThan(ProfileCardMetrics.lobeDiameter, ProfileCardMetrics.cornerRadius)
     }
 
-    func testCardIsTallerThanLobe() {
-        XCTAssertGreaterThan(ProfileCardMetrics.height, ProfileCardMetrics.lobeDiameter)
+    func testAvatarSitsInsideLobe() {
+        XCTAssertGreaterThan(ProfileCardMetrics.avatarOffset, ProfileCardMetrics.lobeOffset)
+        XCTAssertEqual(
+            ProfileCardMetrics.avatarOffset + ProfileCardMetrics.avatarSize + ProfileCardMetrics.ringPadding,
+            ProfileCardMetrics.lobeDiameter + ProfileCardMetrics.lobeOffset
+        )
     }
 }
