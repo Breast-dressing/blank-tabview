@@ -1,0 +1,87 @@
+name: Build & Test
+
+# ios-ci-workflows 入口文件：.ios-ci.yml 保存全部设置，ci/build.sh 负责
+# 选 Xcode 27.2、生成工程、跑测试、无签名归档并打成 IPA。
+#
+# 与中央仓库模板的唯一差异：中央可复用工作流的 test job 固定在 macos-26，
+# 而 Xcode 27.2 只装在 xcode-27（macOS 27）镜像里，因此就地实现 Build & Test。
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: test & unsigned ipa (Xcode 27.2)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build, test and package
+        run: |
+          set -o pipefail
+          mkdir -p build/out
+          bash ci/build.sh 2>&1 | tee build/out/ci.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload IPA artifact
+        if: ${{ hashFiles('build/BlankTabView-unsigned.ipa') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: build/BlankTabView-unsigned.ipa
+          retention-days: 30
+
+      - name: Publish IPA to release (unsigned-ipa)
+        if: ${{ hashFiles('build/BlankTabView-unsigned.ipa') != '' }}
+        run: |
+          set -euo pipefail
+          gh release view unsigned-ipa >/dev/null 2>&1 || \
+            gh release create unsigned-ipa --title "Unsigned IPA (Xcode 27.2)" \
+              --notes "无签名构建产物，由 GitHub Actions 生成。" --latest=true
+          gh release upload unsigned-ipa build/BlankTabView-unsigned.ipa --clobber
+
+      - name: Always publish the build log
+        if: ${{ always() }}
+        run: |
+          set +e
+          gh release view ci-logs >/dev/null 2>&1 || \
+            gh release create ci-logs --title "CI logs" --notes "最近一次构建日志。" --latest=false
+          cp build/out/ci.log build/ci.log 2>/dev/null || true
+          test -f build/ci.log || echo "no log produced" > build/ci.log
+          gh release upload ci-logs build/ci.log --clobber
+          echo "log published"
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Build & Test (Xcode 27.2 / iOS 27.2)"
+            echo ""
+            echo "- tests: $(cat build/out/test-exit.txt 2>/dev/null || echo 'not run')"
+            echo "- ipa: $(ls -lh build/BlankTabView-unsigned.ipa 2>/dev/null || echo 'not built')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if tests failed
+        if: ${{ always() && hashFiles('build/out/test-exit.txt') != '' }}
+        run: |
+          code=$(cat build/out/test-exit.txt)
+          if [ "$code" != "0" ]; then
+            echo "::error::tests failed with exit code $code"
+            exit 1
+          fi
