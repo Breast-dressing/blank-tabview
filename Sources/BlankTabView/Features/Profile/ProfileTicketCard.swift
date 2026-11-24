@@ -1,8 +1,7 @@
 import SwiftUI
 
 /// 票据卡：头像压在卡片左上角，卡面被头像咬出缺口（头像与缺口间留页面底色间隙，无白边），
-/// 卡内是成员信息 / 四项数据 / 虚线 / 家族四等分。
-/// 几何参数对齐 Flutter 原版：头像 80、间隙 6、倒角 8、圆角 28、卡顶留白 20。
+/// 虚线处左右两侧再各挖一个半圆缺口；半圆半径与头像缺口倒角共用 `ProfileCardMetrics.sideNotchRadius`。
 struct ProfileTicketCard: View {
     let metrics: MemberMetrics
     let families: [Family]
@@ -14,7 +13,14 @@ struct ProfileTicketCard: View {
     var onTapMedals: (() -> Void)?
     var onTapFamily: ((Family) -> Void)?
 
+    @State private var seamY: CGFloat = 0
+    private static let spaceName = "profileTicketCard"
+
     private var member: Member { metrics.member }
+
+    private var shape: ProfileTicketShape {
+        ProfileTicketShape(notchY: seamY)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,17 +33,16 @@ struct ProfileTicketCard: View {
                 .padding(.top, 14)
                 .padding(.horizontal, 14)
 
-            DashedRule()
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
+            seamRule
 
             familySection
                 .padding(.horizontal, 18)
                 .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { ProfileTicketShape().fill(Color(uiColor: .secondarySystemGroupedBackground)) }
-        .clipShape(ProfileTicketShape())
+        .coordinateSpace(name: Self.spaceName)
+        .background { shape.fill(Color(uiColor: .secondarySystemGroupedBackground)) }
+        .clipShape(shape)
         .overlay(alignment: .topLeading) {
             AvatarCircle(
                 urlString: member.pic,
@@ -47,10 +52,29 @@ struct ProfileTicketCard: View {
             .offset(x: ProfileCardMetrics.avatarOffsetX, y: ProfileCardMetrics.avatarOffsetY)
             .accessibilityLabel("头像")
         }
-        // 卡片顶部留白：头像上探出卡片的部分、以及缺口处的页面底色都从这里出
         .padding(.top, ProfileCardMetrics.cardTopInset)
+        .onPreferenceChange(SeamYKey.self) { value in
+            if abs(value - seamY) > 0.5 {
+                seamY = value
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("成员资料卡")
+    }
+
+    /// 虚线：向上报自己的中线位置，供票面轮廓在左右两边挖半圆。
+    private var seamRule: some View {
+        DashedRule()
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: SeamYKey.self,
+                        value: proxy.frame(in: .named(Self.spaceName)).midY
+                    )
+                }
+            }
     }
 
     // MARK: - 头部
@@ -209,6 +233,14 @@ struct ProfileTicketCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// 虚线中线位置（卡片坐标系）。
+private struct SeamYKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

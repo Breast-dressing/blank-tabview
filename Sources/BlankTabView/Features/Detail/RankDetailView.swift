@@ -97,6 +97,7 @@ final class RankDetailModel: ObservableObject {
 
 // MARK: - View
 
+/// 排行榜：用系统的 `List`（Plain 样式，通话记录那种行），背景与「我的」页同一系统灰。
 struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
 
@@ -107,54 +108,66 @@ struct RankDetailView: View {
     }
 
     var body: some View {
-        DetailScroll {
-            MemberHeaderBar(
-                name: model.member.title,
-                pic: model.member.pic,
-                subtitle: model.member.medalText
-            )
-
+        List {
+            header
             if model.tabs.count > 1 {
                 PillTabsView(
                     titles: model.tabs.map { Fmt.cleanTabName($0.name) },
                     selected: model.selectedIndex,
                     onSelect: { index in Task { await model.select(index) } }
                 )
-                .padding(.horizontal, -20)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 10, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
-
             content
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
     }
 
+    private var header: some View {
+        MemberHeaderBar(
+            name: model.member.title,
+            pic: model.member.pic,
+            subtitle: model.member.medalText
+        )
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 10, trailing: 16))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
     @ViewBuilder
     private var content: some View {
         if model.loading {
-            StateNotice(title: "正在读取榜单…", progress: true)
+            stateRow(StateNotice(title: "正在读取榜单…", progress: true))
         } else if let error = model.error, model.tabLoading == false {
-            StateNotice(title: "榜单加载失败", message: error, actionTitle: "重试") {
-                Task { await model.load() }
-            }
-        } else if model.tabLoading {
-            StateNotice(title: "正在读取该榜单…", progress: true)
-        } else if let detail = model.detail, !detail.items.isEmpty {
-            InfoCard(padding: 6) {
-                VStack(spacing: 0) {
-                    ForEach(Array(detail.items.enumerated()), id: \.offset) { index, item in
-                        row(item)
-                        if index < detail.items.count - 1 {
-                            Divider().padding(.leading, 54)
-                        }
-                    }
+            stateRow(
+                StateNotice(title: "榜单加载失败", message: error, actionTitle: "重试") {
+                    Task { await model.load() }
                 }
+            )
+        } else if model.tabLoading {
+            stateRow(StateNotice(title: "正在读取该榜单…", progress: true))
+        } else if let detail = model.detail, !detail.items.isEmpty {
+            ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
+                row(item)
             }
         } else {
-            StateNotice(title: "暂无数据", message: model.detail?.emptyText)
+            stateRow(StateNotice(title: "暂无数据", message: model.detail?.emptyText))
         }
+    }
+
+    private func stateRow<Content: View>(_ notice: Content) -> some View {
+        notice
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 
     private func row(_ item: RankMember) -> some View {
@@ -173,7 +186,7 @@ struct RankDetailView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
                     if let selected = AppServices.shared.store.selectedMemberId,
-                       Fmt.decodeId(item.itemId) == selected {
+                       MemberId.matches(item.itemId, selected) {
                         MeBadge()
                     }
                     if let wear = item.wearTexts.first, !wear.isEmpty {
@@ -200,7 +213,6 @@ struct RankDetailView: View {
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, 10)
         .padding(.vertical, 10)
     }
 }
