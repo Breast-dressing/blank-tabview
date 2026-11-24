@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Model
 
@@ -117,7 +118,7 @@ struct MedalModuleView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 头部放在 List 外面，边距与卡片容器一致（20），不会被卡片圆角裁剪。
+            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
             MemberSectionHeader(
                 title: model.member.title,
                 pic: model.member.pic,
@@ -170,7 +171,9 @@ struct MedalModuleView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(.compact)
+            .scrollContentBackground(.hidden)
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 勋章详情 sheet 入参。
 struct MedalSheetTarget: Identifiable {
@@ -122,7 +123,7 @@ struct MedalsHallView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 头部放在 List 外面，边距与卡片容器一致（20），不会被卡片圆角裁剪。
+            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
             MemberSectionHeader(
                 title: model.member.title,
                 pic: model.member.pic,
@@ -172,7 +173,9 @@ struct MedalsHallView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(.compact)
+            .scrollContentBackground(.hidden)
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("已获得奖章")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
