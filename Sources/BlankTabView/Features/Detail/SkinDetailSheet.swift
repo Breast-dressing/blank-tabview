@@ -3,8 +3,8 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（system 标准半屏、隐藏抓手），左上关闭、右上分享。
-/// 内容：大图 → 名称 + 全服解锁人数 → 右下两行「限定编号（粗体）/ 获取日期」。
+/// 单个皮肤详情：原生 sheet（固定高度、禁用液态玻璃、隐藏抓手）。
+/// 标题栏显示皮肤名字；正文「限定编号 → 获取日期 + 人数已获得」。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -31,27 +31,25 @@ struct SkinDetailSheet: View {
                     imageView
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(skin.name)
-                            .font(.system(size: 19, weight: .bold))
-                        Text(skin.userCount > 0 ? "全服解锁 \(Fmt.thousands(skin.userCount)) 人" : "全服解锁人数 -")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    VStack(alignment: .trailing, spacing: 2) {
+                        // 原来是皮肤名字的位置，换成限定编号，字号字重不变。
                         Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
-                            .font(.system(size: 15, weight: .bold))
-                        Text(skin.unlockedDate.isEmpty ? "-" : skin.unlockedDate)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 19, weight: .bold))
+
+                        HStack(spacing: 8) {
+                            if !skin.unlockedDate.isEmpty {
+                                Text(skin.unlockedDate)
+                            }
+                            Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("皮肤详情")
+            .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -68,8 +66,11 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.height(560)])
         .presentationDragIndicator(.hidden)
+        // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
+        .presentationBackground(Color(uiColor: .systemGroupedBackground))
+        .presentationCornerRadius(36)
     }
 
     /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
