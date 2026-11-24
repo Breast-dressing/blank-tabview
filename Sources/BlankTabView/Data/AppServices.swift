@@ -11,6 +11,7 @@ final class AppServices: @unchecked Sendable {
     let honors: HonorRepository
     let medals: MedalRepository
     let metrics: MemberMetricsService
+    let stats: FamilyStatsService
 
     private init() {
         let store = AppStore.open()
@@ -19,6 +20,7 @@ final class AppServices: @unchecked Sendable {
         let families = FamilyRepository(store: store, api: api)
         let honors = HonorRepository(store: store)
         let medals = MedalRepository(store: store, api: api)
+        let stats = FamilyStatsService(store: store, honors: honors)
         let metrics = MemberMetricsService(
             store: store,
             families: families,
@@ -32,6 +34,7 @@ final class AppServices: @unchecked Sendable {
         self.families = families
         self.honors = honors
         self.medals = medals
+        self.stats = stats
         self.metrics = metrics
     }
 }

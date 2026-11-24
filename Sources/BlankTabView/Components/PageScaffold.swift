@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 统一页面骨架：标题交给导航栏（大标题，左上角），内容直接接在工具栏下面。
+/// 统一页面骨架：标题放在导航栏内的左侧（Apple Music 那种），内容直接接在工具栏下面。
 struct PageScaffold<Content: View>: View {
     let title: String
     let background: Color
@@ -31,8 +31,15 @@ struct PageScaffold<Content: View>: View {
             }
         }
         .background(background.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Text(title)
+                    .font(.system(size: 28, weight: .bold))
+                    .fixedSize()
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
     }
 
     private var stack: some View {

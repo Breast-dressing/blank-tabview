@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// 「我的」页的状态机：选中成员 → 补全成员资料 → 拉指标 → 荣誉分组；不依赖 UI。
-/// 选中 ID 一律经 `MemberId.canonical` 归一化，与磁盘里的成员资料 key 保持一致。
+/// 选中 ID 一律经 `MemberId.canonical` 归一化；家族荣誉统一走 `FamilyStatsService`。
 @MainActor
 final class ProfileViewModel: ObservableObject {
     private let services = AppServices.shared
@@ -15,9 +15,12 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var memberId: String?
 
     private var lastMemberId: String?
+    private var refreshedFamilyStats = false
 
     func load(force: Bool = false) async {
+        await refreshFamilyStatsIfNeeded(force: force)
         families = services.families.families
+
         var resolved = services.store.selectedMemberId.flatMap { raw -> String? in
             let canonical = MemberId.canonical(raw)
             return canonical.isEmpty ? nil : canonical
@@ -70,13 +73,24 @@ final class ProfileViewModel: ObservableObject {
         loading = false
     }
 
-    /// 家族本周荣誉值：优先用成员荣誉汇总，否则回退家族页上的 weekHonor。
+    /// 家族页里总荣誉缺失（旧数据 / 分享链接）时补拉一次详情，避免卡片一直是 0。
+    private func refreshFamilyStatsIfNeeded(force: Bool = false) async {
+        let current = services.families.families
+        guard force || !refreshedFamilyStats else { return }
+        refreshedFamilyStats = true
+        for family in current where Fmt.parseNumber(family.honor) <= 0 {
+            _ = await services.families.refreshStats(family)
+        }
+    }
+
+    /// 家族总荣誉展示（唯一来源）。
+    func honorText(of family: Family) -> String {
+        services.stats.honorText(family)
+    }
+
+    /// 家族本周荣誉值（唯一来源）。
     func weekHonor(of family: Family) -> Double {
-        let names = services.store.familyMembers(family.id)
-            .map(\.title)
-            .filter { !$0.isEmpty }
-        if names.isEmpty { return Fmt.parseNumber(family.weekHonor) }
-        return services.honors.familyDailyTotals(names).values.reduce(0, +)
+        services.stats.weekHonor(family)
     }
 
     /// 近 7 天横坐标：11/18 … 11/24

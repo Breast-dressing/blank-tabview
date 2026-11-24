@@ -1,6 +1,7 @@
 import Foundation
 
 /// 家族：链接归一化、页面解析、成员拉取、成员⇄家族归属。
+/// 家族页解析只有 `family(from:familyId:rawUrl:)` 一套；分享页缺详情时统一补拉 i2 家族页。
 final class FamilyRepository: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
@@ -75,10 +76,9 @@ final class FamilyRepository: @unchecked Sendable {
         store.clearFamilyMembers(removed.id)
         store.saveFamilies(cache)
 
-        // 被删家族里正好是当前选中的成员：清空选中，让「我的」页回到空状态
         if let selected = store.selectedMemberId,
            selected.isEmpty == false,
-           previousMembers.contains(where: { $0.itemId == selected }) {
+           previousMembers.contains(where: { MemberId.matches($0.itemId, selected) }) {
             store.setSelectedMember("")
         }
         return cache
@@ -108,8 +108,7 @@ final class FamilyRepository: @unchecked Sendable {
             throw ApiError("解析失败：无法从链接读取家族信息，请确认这是家族主页链接")
         }
 
-        let ssrData = QqApi.map(ssr["data"])
-        let data = ssrData.isEmpty ? QqApi.map(QqApi.map(ssr["req_0"])["data"]) : ssrData
+        let data = Self.dataOf(ssr)
         let query = QqApi.map(ssr["query"])
 
         var familyId = QqApi.str(query["family_id"])
@@ -121,54 +120,101 @@ final class FamilyRepository: @unchecked Sendable {
             throw ApiError("解析失败：未找到家族 ID")
         }
 
+        var parsed = Self.family(from: data, familyId: familyId, rawUrl: url)
+        // 分享链接里通常没有「总荣誉 / 成员数」这些详情，缺了就补拉一次 i2 家族页
+        if parsed.name.isEmpty || Fmt.parseNumber(parsed.honor) <= 0,
+           let detail = await fetchDetail(familyId: familyId) {
+            parsed = Self.merge(parsed, detail)
+        }
+        if parsed.name.isEmpty { parsed.name = "家族 \(familyId)" }
+        return parsed
+    }
+
+    /// 重新拉家族详情，刷新总荣誉 / 排名 / 成员数（旧数据缺值时用）。
+    @discardableResult
+    func refreshStats(_ family: Family) async -> Family {
+        guard let fresh = await fetchDetail(familyId: family.id),
+              let index = cache.firstIndex(where: { $0.id == family.id }) else { return family }
+        let merged = Self.merge(cache[index], fresh)
+        cache[index] = merged
+        store.saveFamilies(cache)
+        return merged
+    }
+
+    private func fetchDetail(familyId: String) async -> Family? {
+        let url = "https://i2.y.qq.com/?family_id=\(familyId)"
+        guard let html = try? await api.fetchHtml(url),
+              let ssr = QqApi.extractSsr(html) else { return nil }
+        let data = Self.dataOf(ssr)
+        guard !data.isEmpty else { return nil }
+        return Self.family(from: data, familyId: familyId, rawUrl: url)
+    }
+
+    /// SSR 里的家族数据：data → req_0.data → 再解开一层 data。
+    static func dataOf(_ ssr: [String: Any]) -> [String: Any] {
+        var data = QqApi.map(ssr["data"])
+        if data.isEmpty { data = QqApi.map(QqApi.map(ssr["req_0"])["data"]) }
+        if let nested = data["data"] as? [String: Any], !nested.isEmpty { data = nested }
+        return data
+    }
+
+    /// 家族页数据的唯一解析入口。honor 保留接口原文（如「1557.6万」），不再自己截数字。
+    static func family(from data: [String: Any], familyId: String, rawUrl: String) -> Family {
         var name = QqApi.str(data["Name"])
         var avatar = QqApi.str(data["Avatar"])
         if avatar.isEmpty { avatar = QqApi.str(data["Pic"]) }
 
-        if name.isEmpty {
-            // 部分分享链接只带了 family_id，补一次 i2 家族页拿名称 / 头像
-            let detailURL = "https://i2.y.qq.com/?family_id=\(familyId)"
-            if let detailHtml = try? await api.fetchHtml(detailURL),
-               let detailSsr = QqApi.extractSsr(detailHtml) {
-                let detail = QqApi.map(QqApi.map(detailSsr["data"])["data"])
-                if name.isEmpty { name = QqApi.str(detail["Name"]) }
-                if avatar.isEmpty { avatar = QqApi.str(detail["Avatar"]) }
-            }
-        }
-
-        var honor = "0"
+        var honor = ""
         var rank = "--"
         var pkWin = "--"
         var memberCount = "0"
-        for item in QqApi.list(data["DetailItemList"]) {
+        let primary = QqApi.list(data["DetailItemList"])
+        let nested = QqApi.list(QqApi.map(data["Detail"])["DetailItemList"])
+        for item in (primary.isEmpty ? nested : primary) {
             let desc = QqApi.str(item["Desc"])
-            let title = QqApi.str(item["Title"])
+            let title = QqApi.str(item["Title"]).trimmingCharacters(in: .whitespacesAndNewlines)
             if desc.contains("总荣誉") {
-                honor = digits(title, fallback: "0")
+                honor = title
             } else if desc.contains("周排名") {
                 rank = title.isEmpty ? "--" : title
             } else if desc.contains("PK") || desc.contains("胜场") {
                 pkWin = title.isEmpty ? "--" : title
             } else if desc.contains("成员") {
-                memberCount = digits(title, fallback: "0")
+                memberCount = digits(title, fallback: memberCount)
             }
         }
 
-        if name.isEmpty { name = "家族 \(familyId)" }
         return Family(
             id: familyId,
             name: name,
             avatar: avatar.replacingOccurrences(of: "http://", with: "https://"),
+            sign: QqApi.str(data["Announcement"]),
             honor: honor,
             rank: rank,
             pkWin: pkWin,
             members: memberCount,
             weekHonor: nil,
-            rawUrl: url
+            rawUrl: rawUrl
         )
     }
 
-    private func digits(_ text: String, fallback: String) -> String {
+    /// 用新拉到的详情覆盖旧家族，只补非空字段。
+    static func merge(_ base: Family, _ fresh: Family) -> Family {
+        var out = base
+        if out.id.isEmpty { out.id = fresh.id }
+        if fresh.name.isEmpty == false, out.name.isEmpty || out.name.hasPrefix("家族 ") {
+            out.name = fresh.name
+        }
+        if fresh.avatar.isEmpty == false { out.avatar = fresh.avatar }
+        if fresh.sign.isEmpty == false { out.sign = fresh.sign }
+        if Fmt.parseNumber(fresh.honor) > 0 || out.honor.isEmpty { out.honor = fresh.honor }
+        if fresh.rank != "--" || out.rank == "--" { out.rank = fresh.rank }
+        if fresh.pkWin != "--" || out.pkWin == "--" { out.pkWin = fresh.pkWin }
+        if fresh.memberCount > 0 || out.memberCount == 0 { out.members = fresh.members }
+        return out
+    }
+
+    static func digits(_ text: String, fallback: String) -> String {
         let numbers = text.filter { $0.isNumber }
         return numbers.isEmpty ? fallback : numbers
     }
@@ -233,7 +279,7 @@ final class FamilyRepository: @unchecked Sendable {
         }
         for family in cache {
             let members = memberCache[family.id] ?? store.familyMembers(family.id)
-            if members.contains(where: { $0.itemId == itemId }) { return family }
+            if members.contains(where: { MemberId.matches($0.itemId, itemId) }) { return family }
         }
         if let info = store.memberInfo(itemId), !info.familyId.isEmpty,
            let family = cache.first(where: { $0.id == info.familyId }) {
