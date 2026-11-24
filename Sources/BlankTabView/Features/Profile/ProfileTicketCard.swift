@@ -1,11 +1,17 @@
 import SwiftUI
 
 /// 票据卡：头像压在卡片左上角，卡内是成员信息 / 四项数据 / 虚线 / 家族四等分。
+/// 四项数据与家族格都可以点进详情页；「管理」仍进设置页。
 struct ProfileTicketCard: View {
     let metrics: MemberMetrics
     let families: [Family]
     let weekHonor: (Family) -> Double
     let onManage: () -> Void
+    var onTapWeek: (() -> Void)?
+    var onTapMonth: (() -> Void)?
+    var onTapSkins: (() -> Void)?
+    var onTapMedals: (() -> Void)?
+    var onTapFamily: ((Family) -> Void)?
 
     private var member: Member { metrics.member }
 
@@ -69,29 +75,43 @@ struct ProfileTicketCard: View {
 
     private var statsRow: some View {
         HStack(spacing: 0) {
-            stat(value: metrics.displayWeekRank, label: tabLabel(metrics.weekTabName, fallback: "周榜"))
+            stat(value: metrics.displayWeekRank, label: tabLabel(metrics.weekTabName, fallback: "周榜"), action: onTapWeek)
             statDivider
-            stat(value: metrics.displayMonthRank, label: tabLabel(metrics.monthTabName, fallback: "月榜"))
+            stat(value: metrics.displayMonthRank, label: tabLabel(metrics.monthTabName, fallback: "月榜"), action: onTapMonth)
             statDivider
-            stat(value: metrics.displaySkinCount, label: "乐迷皮肤")
+            stat(value: metrics.displaySkinCount, label: "乐迷皮肤", action: onTapSkins)
             statDivider
-            stat(value: metrics.medalDesc, label: "已获得奖章")
+            stat(value: metrics.medalDesc, label: "已获得奖章", action: onTapMedals)
         }
     }
 
-    private func stat(value: String, label: String) -> some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
+    private func stat(value: String, label: String, action: (() -> Void)?) -> some View {
+        Button {
+            action?()
+        } label: {
+            VStack(spacing: 6) {
+                Text(value)
+                    .font(.system(size: 20, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                HStack(spacing: 2) {
+                    Text(label)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if action != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                }
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .disabled(action == nil)
+        .accessibilityHint(action == nil ? "暂无可查看的详情" : "查看\(label)详情")
     }
 
     private var statDivider: some View {
@@ -145,29 +165,42 @@ struct ProfileTicketCard: View {
     }
 
     private func familyCell(_ family: Family) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(family.name.isEmpty ? "家族" : family.name)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+        Button {
+            onTapFamily?(family)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 2) {
+                    Text(family.name.isEmpty ? "家族" : family.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if onTapFamily != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(Fmt.thousands(family.honor))
-                    .font(.system(size: 17, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text("荣誉值")
-                    .font(.system(size: 9))
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(Fmt.thousands(family.honor))
+                        .font(.system(size: 17, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text("荣誉值")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("本周\(Fmt.thousands(weekHonor(family)))荣誉值")
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-
-            Text("本周\(Fmt.thousands(weekHonor(family)))荣誉值")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
     }
 }
 
