@@ -14,6 +14,11 @@ extension AppServices {
     }
 }
 
+extension Fmt {
+    /// 计数（点赞数等）直出，不做千分位，保持榜行紧凑。
+    static func compact(_ value: Int) -> String { "\(value)" }
+}
+
 /// 近 7 天横坐标：11/18 … 11/24
 enum DayLabels {
     static var recent7: [String] {

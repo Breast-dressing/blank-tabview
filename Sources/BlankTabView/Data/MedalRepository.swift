@@ -31,9 +31,8 @@ final class MedalRepository: @unchecked Sendable {
             if let task = pageInflight[url] { return try await task.value }
         }
 
-        let task = Task { [api] in
-            try await api.parseMedalHall(url, onlyInitial: onlyInitial)
-        }
+        let apiRef = api
+        let task = Task { try await apiRef.parseMedalHall(url, onlyInitial: onlyInitial) }
         pageInflight[url] = task
 
         do {
@@ -51,13 +50,14 @@ final class MedalRepository: @unchecked Sendable {
     func ensureHallTabs(_ page: MedalHallPage, onUpdate: @escaping (MedalHallPage) -> Void) async {
         let pending = page.results.indices.filter { page.results[$0].loading && !page.results[$0].success }
         guard !pending.isEmpty else { return }
-        let encUin = page.encUin
+        let apiRef = api
+        let uin = page.encUin
 
         await withTaskGroup(of: (Int, ModuleTabResult).self) { group in
             for index in pending {
                 let tab = page.results[index].tab
-                group.addTask { [api, encUin] in
-                    (index, await api.fetchHallTab(encUin: encUin, tab: tab))
+                group.addTask {
+                    (index, await apiRef.fetchHallTab(encUin: uin, tab: tab))
                 }
             }
             for await (index, fresh) in group {
@@ -104,9 +104,8 @@ final class MedalRepository: @unchecked Sendable {
             if let task = rankInflight[url] { return try await task.value }
         }
 
-        let task = Task { [api] in
-            try await api.parseRankPage(url)
-        }
+        let apiRef = api
+        let task = Task { try await apiRef.parseRankPage(url) }
         rankInflight[url] = task
 
         do {
@@ -133,17 +132,6 @@ final class MedalRepository: @unchecked Sendable {
         do {
             let detail = try await api.fetchMedalDetail(url: url, medalId: medalId, encUin: encUin)
             detailCache[key] = detail
-            if let payload = try? JSONSerialization.data(withJSONObject: [
-                "MedalID": detail.medalId,
-                "Scheme": detail.scheme,
-                "FanName": detail.fan?.name ?? "",
-                "FanPic": detail.fan?.pic ?? "",
-                "FanCurrent": detail.fan?.current ?? 0,
-                "FanUpper": detail.fan?.upper ?? 0
-            ]) {
-                // 本地落盘一份，断网时还能回放上次的数据
-                _ = payload
-            }
             return detail
         } catch {
             if let cached = detailCache[key] { return cached }
@@ -163,10 +151,6 @@ final class MedalRepository: @unchecked Sendable {
     }
 
     func cachedSkins(_ medalId: String) -> [SkinItem] {
-        store.skinCache(medalId)
-    }
-
-    func cachedSkins(_ medalId: String, uin: String) -> [SkinItem] {
         store.skinCache(medalId)
     }
 
