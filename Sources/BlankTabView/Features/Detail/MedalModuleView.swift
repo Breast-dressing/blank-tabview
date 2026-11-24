@@ -116,60 +116,61 @@ struct MedalModuleView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                MemberSectionHeader(
-                    title: model.member.title,
-                    pic: model.member.pic,
-                    subtitle: headerSubtitle,
-                    count: "\(unlockedCount)",
-                    unit: "枚"
-                )
-                .listRowInsets(EdgeInsets())
-                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
-                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
-            }
+        VStack(spacing: 0) {
+            // 头部放在 List 外面，边距与卡片容器一致（20），不会被卡片圆角裁剪。
+            MemberSectionHeader(
+                title: model.member.title,
+                pic: model.member.pic,
+                subtitle: headerSubtitle,
+                count: "\(unlockedCount)",
+                unit: "枚"
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
 
-            if model.loading {
-                StateNotice(title: "正在读取模块…", progress: true)
-                    .listRowBackground(Color.clear)
-            } else if let error = model.error {
-                StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
-                    Task { await model.load() }
-                }
-                .listRowBackground(Color.clear)
-            } else if model.items.isEmpty {
-                StateNotice(title: "这个模块还没有勋章")
-                    .listRowBackground(Color.clear)
-            } else {
-                Section {
-                    ZoomedMedalTileGrid(items: model.items, zoomNamespace: zoomNS) { item in
-                        if let route = model.openTile(item) {
-                            pendingPush = route
-                        }
+            List {
+                if model.loading {
+                    StateNotice(title: "正在读取模块…", progress: true)
+                        .listRowBackground(Color.clear)
+                } else if let error = model.error {
+                    StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
+                        Task { await model.load() }
                     }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
-
-                    if model.hasNext {
-                        Button {
-                            Task { await model.loadMore() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                if model.loadingMore { ProgressView() }
-                                Text(model.loadingMore ? "正在加载…" : "加载更多")
-                                    .font(.system(size: 14, weight: .medium))
+                    .listRowBackground(Color.clear)
+                } else if model.items.isEmpty {
+                    StateNotice(title: "这个模块还没有勋章")
+                        .listRowBackground(Color.clear)
+                } else {
+                    Section {
+                        ZoomedMedalTileGrid(items: model.items, zoomNamespace: zoomNS) { item in
+                            if let route = model.openTile(item) {
+                                pendingPush = route
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
                         }
-                        .disabled(model.loadingMore)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+
+                        if model.hasNext {
+                            Button {
+                                Task { await model.loadMore() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if model.loadingMore { ProgressView() }
+                                    Text(model.loadingMore ? "正在加载…" : "加载更多")
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                            .disabled(model.loadingMore)
+                        }
                     }
                 }
             }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(.compact)
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }

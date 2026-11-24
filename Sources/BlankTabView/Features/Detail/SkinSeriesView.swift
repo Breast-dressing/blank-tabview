@@ -20,35 +20,36 @@ struct SkinSeriesView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                MemberSectionHeader(
-                    title: member.title,
-                    pic: member.pic,
-                    subtitle: headerSubtitle,
-                    count: "\(unlockedCount)",
-                    unit: "款"
-                )
-                .listRowInsets(EdgeInsets())
-                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
-                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
-            }
+        VStack(spacing: 0) {
+            // 头部放在 List 外面，边距与卡片容器一致（20），不会被卡片圆角裁剪。
+            MemberSectionHeader(
+                title: member.title,
+                pic: member.pic,
+                subtitle: headerSubtitle,
+                count: "\(unlockedCount)",
+                unit: "款"
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
 
-            Section {
-                if skins.isEmpty {
-                    StateNotice(title: "这个系列还没有皮肤")
-                        .listRowBackground(Color.clear)
-                } else {
-                    SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
-                        selectedSkin = skin
+            List {
+                Section {
+                    if skins.isEmpty {
+                        StateNotice(title: "这个系列还没有皮肤")
+                            .listRowBackground(Color.clear)
+                    } else {
+                        SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
+                            selectedSkin = skin
+                        }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                        .listRowSeparator(.hidden)
                     }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
-                    .listRowSeparator(.hidden)
                 }
             }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(.compact)
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
         .navigationTitle(seriesName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedSkin) { skin in
