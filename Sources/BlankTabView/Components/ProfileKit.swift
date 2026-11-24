@@ -102,6 +102,8 @@ struct MemberHeaderBar: View {
 struct MedalTileCell: View {
     let item: MedalItem
 
+    private var height: CGFloat = 74
+
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
@@ -111,31 +113,44 @@ struct MedalTileCell: View {
                     AsyncImage(url: url) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFit()
+                                .opacity(item.isUnlocked ? 1 : 0.55)
                         } else {
                             ProgressView()
                         }
                     }
                     .padding(6)
                 } else {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.secondary)
+                    placeholder
+                }
+                if !item.isUnlocked {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.black.opacity(0.32))
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
             }
-            .frame(height: 72)
+            .frame(height: height)
 
             Text(item.name)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
-            if !item.desc.isEmpty {
-                Text(item.desc)
-                    .font(.system(size: 9))
+            if !item.subtitle.isEmpty {
+                Text(item.subtitle)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
+    }
+
+    private var placeholder: some View {
+        Image(systemName: "medal.fill")
+            .font(.system(size: 18))
+            .foregroundStyle(.secondary)
     }
 }
 
