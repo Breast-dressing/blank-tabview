@@ -1,7 +1,7 @@
 import Foundation
 
 /// 家族：链接归一化、页面解析、成员拉取、成员⇄家族归属。
-/// 家族页解析只有 `family(from:familyId:rawUrl:)` 一套；分享页缺详情时统一补拉 i2 家族页。
+/// 家族页解析只有 `family(from:familyId:rawUrl:)` 一套；总荣誉保留接口原文，不做数字处理。
 final class FamilyRepository: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
@@ -19,7 +19,6 @@ final class FamilyRepository: @unchecked Sendable {
 
     // MARK: - 链接归一化
 
-    /// 兼容用户直接拷贝的各类家族链接：带零宽字符、换行、无 scheme、短链、family_id。
     static func normalizeFamilyUrl(_ raw: String) throws -> String {
         var text = raw
         for scalar in ["\u{200B}", "\u{200C}", "\u{200D}", "\u{FEFF}"] {
@@ -102,6 +101,12 @@ final class FamilyRepository: @unchecked Sendable {
 
     // MARK: - 解析家族页
 
+    /// 家族页“有没有总荣誉”只看接口原文是否为空 / 为 0，不做数字换算。
+    static func hasHonor(_ family: Family) -> Bool {
+        let honor = family.honor.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !honor.isEmpty && honor != "0"
+    }
+
     func parse(from url: String) async throws -> Family {
         let html = try await api.fetchHtml(url)
         guard let ssr = QqApi.extractSsr(html) else {
@@ -122,7 +127,7 @@ final class FamilyRepository: @unchecked Sendable {
 
         var parsed = Self.family(from: data, familyId: familyId, rawUrl: url)
         // 分享链接里通常没有「总荣誉 / 成员数」这些详情，缺了就补拉一次 i2 家族页
-        if parsed.name.isEmpty || Fmt.parseNumber(parsed.honor) <= 0,
+        if parsed.name.isEmpty || Self.hasHonor(parsed) == false,
            let detail = await fetchDetail(familyId: familyId) {
             parsed = Self.merge(parsed, detail)
         }
@@ -158,7 +163,7 @@ final class FamilyRepository: @unchecked Sendable {
         return data
     }
 
-    /// 家族页数据的唯一解析入口。honor 保留接口原文（如「1557.6万」），不再自己截数字。
+    /// 家族页数据的唯一解析入口。总荣誉保存接口原文字符串（如「1557.6万」），不截数字。
     static func family(from data: [String: Any], familyId: String, rawUrl: String) -> Family {
         var name = QqApi.str(data["Name"])
         var avatar = QqApi.str(data["Avatar"])
@@ -207,7 +212,7 @@ final class FamilyRepository: @unchecked Sendable {
         }
         if fresh.avatar.isEmpty == false { out.avatar = fresh.avatar }
         if fresh.sign.isEmpty == false { out.sign = fresh.sign }
-        if Fmt.parseNumber(fresh.honor) > 0 || out.honor.isEmpty { out.honor = fresh.honor }
+        if hasHonor(fresh) || out.honor.isEmpty { out.honor = fresh.honor }
         if fresh.rank != "--" || out.rank == "--" { out.rank = fresh.rank }
         if fresh.pkWin != "--" || out.pkWin == "--" { out.pkWin = fresh.pkWin }
         if fresh.memberCount > 0 || out.memberCount == 0 { out.members = fresh.members }
@@ -265,7 +270,6 @@ final class FamilyRepository: @unchecked Sendable {
         return entries
     }
 
-    /// 跨家族汇总全部成员（去重），失败不阻塞其他家族。
     func allMembers(force: Bool = false) async -> [FamilyMemberEntry] {
         for family in cache {
             _ = try? await loadMembers(family, force: force)
