@@ -5,6 +5,7 @@ import SwiftUI
 struct ProfileTicketCard: View {
     let metrics: MemberMetrics
     let families: [Family]
+    let honorText: (Family) -> String
     let weekHonor: (Family) -> Double
     let onManage: () -> Void
     var onTapWeek: (() -> Void)?
@@ -214,7 +215,7 @@ struct ProfileTicketCard: View {
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(Fmt.thousands(family.honor))
+                    Text(honorText(family))
                         .font(.system(size: 17, weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)

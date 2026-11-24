@@ -32,7 +32,7 @@ enum ProfileCardMetrics {
 /// 票面轮廓：圆角矩形左上角被“头像 + 间隙”的圆咬出缺口，
 /// 缺口与顶边 / 左边交接处用 8pt 圆角倒角；虚线处左右两边各被半圆咬开。
 struct ProfileTicketShape: Shape {
-    /// 虚线位置（卡片坐标系，nil / 0 时不挖侧面半圆）
+    /// 虚线位置（卡片坐标系，0 时不挖侧面半圆）
     var notchY: CGFloat = 0
 
     func path(in rect: CGRect) -> Path {
@@ -45,7 +45,6 @@ struct ProfileTicketShape: Shape {
         let sideNotch = ProfileCardMetrics.sideNotchRadius
         let hasSideNotch = notchY > sideNotch && notchY < rect.height - sideNotch
 
-        // 倒角圆心：位于顶边 / 左边上，到缺口圆心的距离 = 缺口半径 + 倒角半径
         let topCenter = CGPoint(
             x: cx + sqrt(max(0, d * d - (f - cy) * (f - cy))),
             y: f
@@ -55,7 +54,6 @@ struct ProfileTicketShape: Shape {
             y: cy + sqrt(max(0, d * d - (f - cx) * (f - cx)))
         )
 
-        // 卡片太小时退化成普通圆角矩形
         if topCenter.x >= rect.width - corner || leftCenter.y >= rect.height - f {
             return Path(roundedRect: rect, cornerRadius: corner)
         }
@@ -76,7 +74,6 @@ struct ProfileTicketShape: Shape {
         }
 
         var path = Path()
-        // 顶边 → 上方倒角 → 缺口 → 左侧倒角 → 左边
         path.move(to: point(topCenter, f, -.pi / 2))
 
         let topTangent = point(hole, r, thetaTop)
@@ -92,7 +89,6 @@ struct ProfileTicketShape: Shape {
         if leftSweep > 0 { leftSweep -= 2 * .pi }
         appendArc(&path, center: leftCenter, radius: f, start: leftStart, sweep: leftSweep)
 
-        // 左边向下：先经过虚线处的半圆缺口
         if hasSideNotch {
             path.addLine(to: CGPoint(x: 0, y: notchY - sideNotch))
             appendArc(&path, center: CGPoint(x: 0, y: notchY), radius: sideNotch, start: -.pi / 2, sweep: .pi)
@@ -102,7 +98,6 @@ struct ProfileTicketShape: Shape {
         path.addLine(to: CGPoint(x: rect.width - corner, y: rect.height))
         appendArc(&path, center: CGPoint(x: rect.width - corner, y: rect.height - corner), radius: corner, start: .pi / 2, sweep: -.pi / 2)
 
-        // 右边向上：同样在虚线处挖半圆
         if hasSideNotch {
             path.addLine(to: CGPoint(x: rect.width, y: notchY + sideNotch))
             appendArc(&path, center: CGPoint(x: rect.width, y: notchY), radius: sideNotch, start: .pi / 2, sweep: .pi)
@@ -114,24 +109,24 @@ struct ProfileTicketShape: Shape {
     }
 }
 
-/// 头像：异步加载，失败时回退到占位图标；`showsRing` 控制那圈浅色描边（「我的」票据卡不带）。
+/// 头像：统一走 `RemoteImageLoader`（带 Referer / UA，QQ 图床才能拿到图）；
+/// `showsRing` 控制那圈浅色描边（「我的」票据卡不带）。
 struct AvatarCircle: View {
     let urlString: String
     var size: CGFloat = ProfileCardMetrics.avatarSize
     var showsRing: Bool = true
 
+    @State private var image: UIImage?
+    @State private var failed = false
+
     var body: some View {
         ZStack {
             Circle().fill(Color(uiColor: .tertiarySystemFill))
-            if let url = URL(string: urlString), !urlString.isEmpty {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        fallback
-                    }
-                }
-            } else {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if urlString.isEmpty || failed {
                 fallback
             }
         }
@@ -141,6 +136,16 @@ struct AvatarCircle: View {
             if showsRing {
                 Circle().strokeBorder(Color(uiColor: .systemBackground).opacity(0.9), lineWidth: 1)
             }
+        }
+        .task(id: urlString) {
+            if let hit = RemoteImageLoader.cached(urlString) {
+                image = hit
+                failed = false
+                return
+            }
+            let loaded = await RemoteImageLoader.image(for: urlString)
+            image = loaded
+            failed = loaded == nil
         }
     }
 

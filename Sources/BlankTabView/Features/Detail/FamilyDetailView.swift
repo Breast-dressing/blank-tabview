@@ -20,9 +20,17 @@ final class FamilyDetailModel: ObservableObject {
         self.family = family
     }
 
+    /// 最新家族数据（总荣誉缺失时会重新拉一次详情）。
+    var currentFamily: Family {
+        services.families.families.first { $0.id == family.id } ?? family
+    }
+
     func load() async {
         loading = true
         error = nil
+        if Fmt.parseNumber(currentFamily.honor) <= 0 {
+            _ = await services.families.refreshStats(family)
+        }
         let serviceRef = services
         let familyRef = family
         do {
@@ -40,15 +48,7 @@ final class FamilyDetailModel: ObservableObject {
     }
 
     func computeHonor() {
-        let names = members.map(\.title).filter { !$0.isEmpty }
-        guard !names.isEmpty else {
-            weekTotal = Fmt.parseNumber(family.weekHonor)
-            lastWeekTotal = 0
-            dayValues = Array(repeating: 0, count: 7)
-            hasHonorData = false
-            return
-        }
-        let totals = services.honors.familyDailyTotals(names, days: 14)
+        let totals = services.stats.weekTotals(family, members: members, days: 14)
         let values = totals.values
         guard values.count == 14 else { return }
         lastWeekTotal = values.prefix(7).reduce(0, +)
@@ -56,6 +56,8 @@ final class FamilyDetailModel: ObservableObject {
         dayValues = Array(values.suffix(7))
         hasHonorData = totals.hasData
     }
+
+    var honorText: String { services.stats.honorText(currentFamily) }
 
     var topMembers: [Member] { Array(members.prefix(5)) }
 
@@ -94,7 +96,7 @@ struct FamilyDetailView: View {
                 }
             }
         }
-        .navigationTitle(model.family.name.isEmpty ? "家族详情" : model.family.name)
+        .navigationTitle(model.currentFamily.name.isEmpty ? "家族详情" : model.currentFamily.name)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
     }
@@ -102,13 +104,13 @@ struct FamilyDetailView: View {
     private var profileCard: some View {
         InfoCard {
             HStack(spacing: 12) {
-                AvatarCircle(urlString: model.family.avatar, size: 56)
+                AvatarCircle(urlString: model.currentFamily.avatar, size: 56)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.family.name.isEmpty ? "家族" : model.family.name)
+                    Text(model.currentFamily.name.isEmpty ? "家族" : model.currentFamily.name)
                         .font(.system(size: 19, weight: .bold))
                         .lineLimit(1)
-                    if !model.family.sign.isEmpty {
-                        Text(model.family.sign)
+                    if !model.currentFamily.sign.isEmpty {
+                        Text(model.currentFamily.sign)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -118,9 +120,9 @@ struct FamilyDetailView: View {
             }
 
             HStack(alignment: .top, spacing: 0) {
-                stat("总荣誉值", Fmt.thousands(model.family.honor))
-                stat("周排名", Fmt.rank(model.family.rank))
-                stat("PK胜场", model.family.pkWin)
+                stat("总荣誉值", model.honorText)
+                stat("周排名", Fmt.rank(model.currentFamily.rank))
+                stat("PK胜场", model.currentFamily.pkWin)
                 memberCountStat
             }
         }
@@ -141,9 +143,9 @@ struct FamilyDetailView: View {
     }
 
     private var memberCountStat: some View {
-        NavigationLink(value: ProfileDestination.memberList(model.family)) {
+        NavigationLink(value: ProfileDestination.memberList(model.currentFamily)) {
             VStack(spacing: 5) {
-                Text("\(model.family.memberCount)")
+                Text("\(model.currentFamily.memberCount)")
                     .font(.system(size: 18, weight: .bold))
                     .monospacedDigit()
                 HStack(spacing: 2) {
@@ -186,7 +188,7 @@ struct FamilyDetailView: View {
                 Text("成员")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
-                NavigationLink(value: ProfileDestination.memberList(model.family)) {
+                NavigationLink(value: ProfileDestination.memberList(model.currentFamily)) {
                     HStack(spacing: 2) {
                         Text("查看全部")
                         Image(systemName: "chevron.right")

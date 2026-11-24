@@ -73,6 +73,7 @@ struct ProfilePage: View {
             ProfileTicketCard(
                 metrics: metrics,
                 families: model.families,
+                honorText: { model.honorText(of: $0) },
                 weekHonor: { model.weekHonor(of: $0) },
                 onManage: { showSettings = true },
                 onTapWeek: tap(MemberEntries.rank(metrics, monthly: false)),
