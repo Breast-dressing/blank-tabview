@@ -3,12 +3,13 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（固定高度、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生 sheet（默认半屏固定高度、禁用液态玻璃、隐藏抓手）。
 /// 标题栏显示皮肤名字；正文「限定编号 → 获取日期 + 人数已获得」。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
     let uin: String
+    var zoomNamespace: Namespace.ID? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -66,11 +67,12 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.height(560)])
+        .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
         // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
         .presentationBackground(Color(uiColor: .systemGroupedBackground))
         .presentationCornerRadius(36)
+        .zoomNavigationTransitionIfAvailable(id: "\(skin.id)-pic", in: zoomNamespace)
     }
 
     /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
@@ -108,5 +110,25 @@ extension Color {
         let green = Double((value >> 8) & 0xFF) / 255
         let blue = Double(value & 0xFF) / 255
         self = Color(red: red, green: green, blue: blue)
+    }
+}
+
+/// iOS 18+ zoom 过渡；没有 namespace 时原样返回。
+private struct ZoomNavigationIfAvailable: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func zoomNavigationTransitionIfAvailable(id: String, in namespace: Namespace.ID?) -> some View {
+        modifier(ZoomNavigationIfAvailable(id: id, namespace: namespace))
     }
 }

@@ -109,6 +109,7 @@ struct SkinsView: View {
     @StateObject private var model: SkinsModel
     @State private var selectedSkin: SkinItem?
     @State private var selectedSeries = ""
+    @Namespace private var zoomNS
 
     init(memberId: String, medalId: String, medalName: String, scheme: String) {
         _model = StateObject(
@@ -117,8 +118,12 @@ struct SkinsView: View {
     }
 
     var body: some View {
-        DetailScroll {
-            skinHeader
+        List {
+            Section {
+                skinHeader
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
             if model.groups.isEmpty {
                 if model.scanning {
@@ -128,7 +133,28 @@ struct SkinsView: View {
                 }
             } else {
                 ForEach(model.groups) { group in
-                    seriesCard(group)
+                    Section {
+                        NavigationLink(value: ProfileDestination.skinSeries(seriesName: group.name, skins: group.skins)) {
+                            HStack(spacing: 6) {
+                                Text(group.name)
+                                    .font(.system(size: 16, weight: .semibold))
+                                Spacer(minLength: 8)
+                                Text("\(unlockedCount(of: group))/\(group.skins.count)")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        SkinTileGrid(
+                            items: Array(group.skins.prefix(3)),
+                            zoomNamespace: zoomNS
+                        ) { skin in
+                            selectedSeries = group.name
+                            selectedSkin = skin
+                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 14, trailing: 16))
+                    }
                 }
 
                 if model.scanning {
@@ -138,16 +164,27 @@ struct SkinsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
+                    .listRowBackground(Color.clear)
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .onDisappear { model.stop() }
         .sheet(item: $selectedSkin) { skin in
-            SkinDetailSheet(skin: skin, seriesName: selectedSeries, uin: model.memberId)
+            SkinDetailSheet(
+                skin: skin,
+                seriesName: selectedSeries,
+                uin: model.memberId,
+                zoomNamespace: zoomNS
+            )
         }
+    }
+
+    private func unlockedCount(of group: SkinSeriesGroup) -> Int {
+        group.skins.filter { $0.isUnlocked }.count
     }
 
     /// 头部直接铺在页面里（不套卡片）：48 头像 + 名字 / 勋章名 + 右侧皮肤数量。
@@ -177,35 +214,12 @@ struct SkinsView: View {
             }
         }
     }
-
-    private func seriesCard(_ group: SkinSeriesGroup) -> some View {
-        InfoCard(padding: 14) {
-            NavigationLink(value: ProfileDestination.skinSeries(seriesName: group.name, skins: group.skins)) {
-                HStack {
-                    Text(group.name)
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("\(group.skins.count)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            SkinTileGrid(items: Array(group.skins.prefix(3))) { skin in
-                selectedSeries = group.name
-                selectedSkin = skin
-            }
-        }
-    }
 }
 
-/// 皮肤卡：大圆角卡片，不铺底色；加载中在整卡中心显示系统 ProgressView（无淡入动画）。
+/// 皮肤卡：大圆角卡片，不铺底色；未解锁时去色压暗；加载中在整卡中心显示系统 ProgressView。
 struct SkinTileCell: View {
     let skin: SkinItem
+    var zoomNamespace: Namespace.ID? = nil
     @State private var image: UIImage?
 
     private let radius: CGFloat = 24
@@ -217,6 +231,9 @@ struct SkinTileCell: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
+                        .saturation(skin.isUnlocked ? 1 : 0)
+                        .opacity(skin.isUnlocked ? 1 : 0.55)
+                        .matchedTransitionSourceIfAvailable(id: "\(skin.id)-pic", in: zoomNamespace)
                 } else {
                     ProgressView()
                 }
@@ -234,12 +251,10 @@ struct SkinTileCell: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
-            if !skin.subtitle.isEmpty {
-                Text(skin.subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text(skin.isUnlocked ? skin.subtitle : "待解锁")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 }
@@ -247,6 +262,7 @@ struct SkinTileCell: View {
 /// 皮肤三列格。
 struct SkinTileGrid: View {
     let items: [SkinItem]
+    var zoomNamespace: Namespace.ID? = nil
     let onTap: (SkinItem) -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
@@ -257,7 +273,7 @@ struct SkinTileGrid: View {
                 Button {
                     onTap(skin)
                 } label: {
-                    SkinTileCell(skin: skin)
+                    SkinTileCell(skin: skin, zoomNamespace: zoomNamespace)
                 }
                 .buttonStyle(.plain)
             }
@@ -268,5 +284,25 @@ struct SkinTileGrid: View {
 #Preview {
     NavigationStack {
         SkinsView(memberId: "12345", medalId: "3069960", medalName: "虞书欣乐迷", scheme: "")
+    }
+}
+
+/// iOS 18+ 的 zoom 过渡源；没有 namespace 时原样返回。
+private struct MatchedSourceIfAvailable: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func matchedTransitionSourceIfAvailable(id: String, in namespace: Namespace.ID?) -> some View {
+        modifier(MatchedSourceIfAvailable(id: id, namespace: namespace))
     }
 }
