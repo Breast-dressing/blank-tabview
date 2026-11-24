@@ -68,11 +68,19 @@ final class FamilyRepository: @unchecked Sendable {
     func removeAt(_ index: Int) -> [Family] {
         guard cache.indices.contains(index) else { return cache }
         let removed = cache.remove(at: index)
+        let previousMembers = memberCache[removed.id] ?? store.familyMembers(removed.id)
+
         memberCache[removed.id] = nil
         inflight[removed.id] = nil
         store.clearFamilyMembers(removed.id)
         store.saveFamilies(cache)
-        if store.selectedMemberId == removed.id { store.setSelectedMember("") }
+
+        // 被删家族里正好是当前选中的成员：清空选中，让「我的」页回到空状态
+        if let selected = store.selectedMemberId,
+           selected.isEmpty == false,
+           previousMembers.contains(where: { $0.itemId == selected }) {
+            store.setSelectedMember("")
+        }
         return cache
     }
 
