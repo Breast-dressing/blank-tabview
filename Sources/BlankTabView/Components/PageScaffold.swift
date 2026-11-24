@@ -81,14 +81,8 @@ extension PageScaffold where Trailing == EmptyView {
     }
 }
 
-extension PageScaffold where Content == EmptyView {
-    init(title: String, background: Color = Color(uiColor: .systemBackground)) {
-        self.init(title: title, background: background, scroll: false, trailing: { EmptyView() }) { EmptyView() }
-    }
-}
-
 #Preview {
     NavigationStack {
-        PageScaffold(title: "首页")
+        PageScaffold(title: "首页") { EmptyView() }
     }
 }
