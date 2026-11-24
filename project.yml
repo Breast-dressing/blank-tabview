@@ -25,7 +25,7 @@ targets:
     info:
       path: Sources/BlankTabView/Info.plist
       properties:
-        CFBundleDisplayName: 三页
+        CFBundleDisplayName: 点点
         CFBundleName: BlankTabView
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"

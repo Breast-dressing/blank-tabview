@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 统一页面骨架：标题在顶部栏内左侧、大字号、纯文字（不是按钮，不是居中 inline 小标题）。
+/// 统一页面骨架：标题用系统大标题（导航栏内左侧，大字号，纯文字，不包按钮）。
 struct PageScaffold<Content: View>: View {
     let title: String
     let background: Color
@@ -31,17 +31,9 @@ struct PageScaffold<Content: View>: View {
             }
         }
         .background(background.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Text(title)
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        }
     }
 
     private var stack: some View {

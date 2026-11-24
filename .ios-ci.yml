@@ -4,7 +4,7 @@ workdir: .
 project: BlankTabView.xcodeproj
 scheme: BlankTabView
 bundle_id: com.breastdressing.blanktabview
-display_name: ''
+display_name: '点点'
 sync_command: 'true'
 generate_command: xcodegen generate
 icon_path: ''

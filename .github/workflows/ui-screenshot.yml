@@ -1,0 +1,61 @@
+name: UI Screenshot
+
+# 临时截图工作流：在 xcode-27 上编译模拟器版本，启动 App 逐页截图，
+# 用于交付前人工核对界面（用完即删，不替代 Build & Test）。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-screenshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shot:
+    name: simulator screenshots
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build for simulator
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          curl -fLsS https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -oq "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP/xcodegen/bin:$PATH"
+          xcodegen generate
+          xcodebuild build \
+            -project BlankTabView.xcodeproj -scheme BlankTabView \
+            -destination "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2" \
+            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO
+
+      - name: Screenshot each tab
+        run: |
+          set -euo pipefail
+          APP=$(find build/DD/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          echo "app=$APP"
+          xcrun simctl boot "iPhone 18 Pro" || true
+          xcrun simctl bootstatus "iPhone 18 Pro" -b
+          xcrun simctl install booted "$APP"
+          for tab in home profile search; do
+            xcrun simctl terminate booted com.breastdressing.blanktabview || true
+            xcrun simctl launch booted com.breastdressing.blanktabview -startTab "$tab"
+            sleep 3
+            xcrun simctl io booted screenshot "build/shot-$tab.png"
+            echo "shot $tab done"
+          done
+          ls -l build/shot-*.png
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: build/shot-*.png
+          retention-days: 7
