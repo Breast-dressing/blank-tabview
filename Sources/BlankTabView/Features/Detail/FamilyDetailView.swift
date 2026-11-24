@@ -23,9 +23,11 @@ final class FamilyDetailModel: ObservableObject {
     func load() async {
         loading = true
         error = nil
+        let serviceRef = services
+        let familyRef = family
         do {
-            let list = try await AsyncTimeout.run(seconds: 30) { [services, family] in
-                try await services.families.loadMembers(family, force: true)
+            let list = try await AsyncTimeout.run(seconds: 30) {
+                try await serviceRef.families.loadMembers(familyRef, force: true)
             }
             members = list
         } catch {

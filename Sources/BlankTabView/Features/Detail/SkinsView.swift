@@ -39,10 +39,6 @@ final class SkinsModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
-    deinit {
-        flag.on = false
-    }
-
     func stop() { flag.on = false }
 
     func load() async {
@@ -60,10 +56,11 @@ final class SkinsModel: ObservableObject {
             self.error = error.localizedDescription
         }
 
+        let flagRef = flag
         await services.medals.scanSkins(
             medalId: medalId,
             uin: memberId,
-            isActive: { [flag] in flag.on },
+            isActive: { flagRef.on },
             onUpdate: { [weak self] list in
                 Task { @MainActor in self?.skins = list }
             }
@@ -172,7 +169,7 @@ struct SkinsView: View {
             }
             .buttonStyle(.plain)
 
-            MedalTileGridLike(items: Array(group.skins.prefix(3))) { skin in
+            SkinTileGrid(items: Array(group.skins.prefix(3))) { skin in
                 selectedSeries = group.name
                 selectedSkin = skin
             }
@@ -180,7 +177,7 @@ struct SkinsView: View {
     }
 }
 
-/// 皮肤小格：大图 + 序号 + 名称。
+/// 皮肤小格：大图 + 名称 + 序号。
 struct SkinTileCell: View {
     let skin: SkinItem
 
@@ -194,12 +191,12 @@ struct SkinTileCell: View {
                         if let image = phase.image {
                             image.resizable().scaledToFit()
                         } else {
-                            Image(systemName: "sparkles").foregroundStyle(.secondary)
+                            placeholder
                         }
                     }
                     .padding(4)
                 } else {
-                    Image(systemName: "sparkles").foregroundStyle(.secondary)
+                    placeholder
                 }
             }
             .frame(height: 74)
@@ -217,10 +214,16 @@ struct SkinTileCell: View {
             }
         }
     }
+
+    private var placeholder: some View {
+        Image(systemName: "sparkles")
+            .font(.system(size: 18))
+            .foregroundStyle(.secondary)
+    }
 }
 
 /// 皮肤三列格。
-struct MedalTileGridLike: View {
+struct SkinTileGrid: View {
     let items: [SkinItem]
     let onTap: (SkinItem) -> Void
 

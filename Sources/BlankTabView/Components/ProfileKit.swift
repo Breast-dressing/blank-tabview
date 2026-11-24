@@ -12,13 +12,15 @@ struct InfoCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12, content: { content })
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .padding(padding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        }
     }
 }
 
@@ -193,7 +195,7 @@ struct DailyBars: View {
     }
 }
 
-/// 描边行：左标签右值。
+/// 左标签右值。
 struct LabeledRow: View {
     let label: String
     let value: String
@@ -217,13 +219,13 @@ struct LabeledRow: View {
     }
 }
 
-/// 加载 / 错误 / 空状态。
+/// 加载 / 错误 / 空状态。action 放在最后，方便尾随闭包。
 struct StateNotice: View {
     let title: String
     var message: String?
     var actionTitle: String?
-    var action: (() -> Void)?
     var progress: Bool = false
+    var action: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -275,11 +277,13 @@ struct DetailScroll<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14, content: { content })
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 28)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 14) {
+                content
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
