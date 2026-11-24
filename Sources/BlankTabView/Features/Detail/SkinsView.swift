@@ -131,63 +131,64 @@ struct SkinsView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                MemberSectionHeader(
-                    title: model.member.title,
-                    pic: model.member.pic,
-                    subtitle: model.headerSubtitle,
-                    count: "\(model.displayTotal)",
-                    unit: "款"
-                )
-                .listRowInsets(EdgeInsets())
-                // 把头部容器的圆角改成 0，不再被卡片圆角裁剪。
-                .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
-            }
+        VStack(spacing: 0) {
+            // 头部放在 List 外面，用与卡片容器相同的左右边距（20），不会被卡片圆角裁剪。
+            MemberSectionHeader(
+                title: model.member.title,
+                pic: model.member.pic,
+                subtitle: model.headerSubtitle,
+                count: "\(model.displayTotal)",
+                unit: "款"
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
 
-            if model.groups.isEmpty {
-                stateRow
-            } else {
-                ForEach(model.groups) { group in
-                    Section {
-                        HStack(spacing: 6) {
-                            Text(group.name)
-                                .font(.system(size: 16, weight: .semibold))
-                            Spacer(minLength: 8)
-                            Text("\(group.unlockedCount)/\(group.skins.count)")
-                                .font(.system(size: 14))
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                            // 只有箭头这个按钮可点：整行不再响应点击。
-                            Button {
-                                pendingSeries = route(for: group)
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
+            List {
+                if model.groups.isEmpty {
+                    stateRow
+                } else {
+                    ForEach(model.groups) { group in
+                        Section {
+                            HStack(spacing: 6) {
+                                Text(group.name)
+                                    .font(.system(size: 16, weight: .semibold))
+                                Spacer(minLength: 8)
+                                // 「已收集 x/y」和箭头在一个按钮里，只有这块可点。
+                                Button {
+                                    pendingSeries = route(for: group)
+                                } label: {
+                                    HStack(spacing: 2) {
+                                        Text("已收集 \(group.unlockedCount)/\(group.skins.count)")
+                                            .font(.system(size: 14))
+                                            .monospacedDigit()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
                                     .foregroundStyle(.secondary)
-                                    .frame(width: 30, height: 28, alignment: .trailing)
                                     .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        }
-                        .listRowSeparator(.hidden)
+                            .listRowSeparator(.hidden)
 
-                        SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
-                            selectedSeries = group.name
-                            selectedSkin = skin
+                            SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
+                                selectedSeries = group.name
+                                selectedSkin = skin
+                            }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                            .listRowSeparator(.hidden)
                         }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
-                        .listRowSeparator(.hidden)
+                    }
+
+                    if model.scanning {
+                        scanningRow
                     }
                 }
-
-                if model.scanning {
-                    scanningRow
-                }
             }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(.compact)
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -271,8 +272,6 @@ struct SkinTileCell: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 86)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .task(id: skin.pic) {
                 image = await RemoteImageLoader.image(for: skin.pic)
             }

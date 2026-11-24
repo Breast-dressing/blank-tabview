@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// 勋章卡：与乐迷皮肤完全同一套卡片形态（图片 86 / 大圆角 / 名字 / 日期或「待解锁」）。
+/// 勋章卡：与乐迷皮肤完全同一套卡片形态（图片 86 / 名字 / 日期或「待解锁」）。
 struct MedalSkinTileCell: View {
     let item: MedalItem
     @State private var image: UIImage?
@@ -21,8 +21,6 @@ struct MedalSkinTileCell: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 86)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .task(id: item.picUrl) {
                 image = await RemoteImageLoader.image(for: item.picUrl)
             }
@@ -41,7 +39,7 @@ struct MedalSkinTileCell: View {
     }
 }
 
-/// 勋章三列格（带 zoom 出发地）：整块包在透明圆角矩形里。
+/// 勋章三列格（带 zoom 出发地）：整块包在透明圆角矩形里，zoom 挂在矩形上。
 struct ZoomedMedalTileGrid: View {
     let items: [MedalItem]
     var zoomNamespace: Namespace.ID? = nil
