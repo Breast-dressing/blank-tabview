@@ -39,6 +39,11 @@ final class MedalsHallModel: ObservableObject {
         results.indices.contains(selectedIndex) ? results[selectedIndex] : results.first
     }
 
+    /// 当前分类里全部勋章 / 已获得数量，用于顶部右侧。
+    var medalTotal: Int { current?.modules.flatMap(\.items).count ?? 0 }
+
+    var medalUnlocked: Int { current?.modules.flatMap(\.items).filter { $0.unlocked }.count ?? 0 }
+
     var errorIndexes: Set<Int> {
         Set(results.indices.filter { !results[$0].success && !results[$0].loading })
     }
@@ -110,38 +115,66 @@ final class MedalsHallModel: ObservableObject {
 struct MedalsHallView: View {
     @StateObject private var model: MedalsHallModel
     @State private var pendingPush: ProfileDestination?
+    @Namespace private var zoomNS
 
     init(memberId: String) {
         _model = StateObject(wrappedValue: MedalsHallModel(memberId: memberId))
     }
 
     var body: some View {
-        DetailScroll {
-            MemberHeaderBar(
-                name: model.member.title,
-                pic: model.member.pic,
-                subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
-                trailing: model.member.title.isEmpty ? "" : ""
-            )
-
-            if model.tabs.count > 1 {
-                PillTabsView(
-                    titles: model.tabs.map { Fmt.cleanTabName($0.name) },
-                    selected: model.selectedIndex,
-                    errorIndexes: model.errorIndexes,
-                    onSelect: { index in Task { await model.select(index) } }
+        List {
+            Section {
+                MemberSectionHeader(
+                    title: model.member.title,
+                    pic: model.member.pic,
+                    subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
+                    count: "\(model.medalUnlocked)/\(model.medalTotal)",
+                    unit: "枚"
                 )
-                .padding(.horizontal, -20)
+                .listRowInsets(EdgeInsets())
+
+                if model.tabs.count > 1 {
+                    PillTabsView(
+                        titles: model.tabs.map { Fmt.cleanTabName($0.name) },
+                        selected: model.selectedIndex,
+                        errorIndexes: model.errorIndexes,
+                        onSelect: { index in Task { await model.select(index) } }
+                    )
+                    .listRowInsets(EdgeInsets())
+                }
+            }
+            .listRowBackground(Color.clear)
+
+            ForEach(Array(moduleSections.enumerated()), id: \.offset) { _, pair in
+                moduleSection(pair.module, tabName: pair.tabName)
             }
 
-            tabContent
+            if model.loading {
+                StateNotice(title: "正在读取勋章数据…", progress: true)
+                    .listRowBackground(Color.clear)
+            } else if let error = model.error {
+                StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+            } else if let current = model.current, !current.success {
+                StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+            } else if moduleSections.isEmpty {
+                StateNotice(title: "暂无奖章数据")
+                    .listRowBackground(Color.clear)
+            }
         }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle("已获得奖章")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
         .sheet(item: $model.sheetTarget) { target in
-            MedalDetailSheet(memberId: model.memberId, target: target)
+            MedalDetailSheet(memberId: model.memberId, target: target, zoomNamespace: zoomNS)
         }
         .navigationDestination(isPresented: Binding(
             get: { pendingPush != nil },
@@ -153,50 +186,18 @@ struct MedalsHallView: View {
         }
     }
 
-    @ViewBuilder
-    private func pushDestination(_ route: ProfileDestination) -> some View {
-        switch route {
-        case let .medalModule(memberId, moduleId, moduleName, tabName):
-            MedalModuleView(memberId: memberId, moduleId: moduleId, moduleName: moduleName, tabName: tabName)
-        case let .skins(memberId, medalId, medalName, scheme):
-            SkinsView(memberId: memberId, medalId: medalId, medalName: medalName, scheme: scheme)
-        default:
-            EmptyView()
-        }
+    private var moduleSections: [(module: MedalModule, tabName: String)] {
+        guard let current = model.current, current.success else { return [] }
+        return current.modules.map { ($0, current.tab.name) }
     }
 
-    @ViewBuilder
-    private var tabContent: some View {
-        if model.loading {
-            StateNotice(title: "正在读取勋章数据…", progress: true)
-        } else if let error = model.error {
-            StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
-                Task { await model.load() }
-            }
-        } else if let current = model.current, !current.success {
-            StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
-                Task { await model.load() }
-            }
-        } else if let current = model.current {
-            if current.modules.isEmpty {
-                StateNotice(title: "暂无模块")
-            } else {
-                ForEach(current.modules, id: \.self) { module in
-                    moduleCard(module, tabName: current.tab.name)
-                }
-            }
-        } else {
-            StateNotice(title: "暂无奖章数据")
-        }
-    }
-
-    private func moduleCard(_ module: MedalModule, tabName: String) -> some View {
-        InfoCard(padding: 14) {
-            HStack {
+    private func moduleSection(_ module: MedalModule, tabName: String) -> some View {
+        Section {
+            HStack(spacing: 8) {
                 Text(module.moduleName.isEmpty ? "模块 \(module.moduleId)" : module.moduleName)
                     .font(.system(size: 16, weight: .semibold))
                     .lineLimit(1)
-                Spacer()
+                Spacer(minLength: 8)
                 if !module.moduleId.isEmpty {
                     Button {
                         pendingPush = .medalModule(
@@ -215,12 +216,27 @@ struct MedalsHallView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .listRowSeparator(.hidden)
 
-            MedalTileGrid(items: Array(module.items.prefix(3))) { item in
+            ZoomedMedalTileGrid(items: Array(module.items.prefix(3)), zoomNamespace: zoomNS) { item in
                 if let route = model.openTile(item, tabName: tabName) {
                     pendingPush = route
                 }
             }
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+            .listRowSeparator(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private func pushDestination(_ route: ProfileDestination) -> some View {
+        switch route {
+        case let .medalModule(memberId, moduleId, moduleName, tabName):
+            MedalModuleView(memberId: memberId, moduleId: moduleId, moduleName: moduleName, tabName: tabName)
+        case let .skins(memberId, medalId, medalName, scheme):
+            SkinsView(memberId: memberId, medalId: medalId, medalName: medalName, scheme: scheme)
+        default:
+            EmptyView()
         }
     }
 }

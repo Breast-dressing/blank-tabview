@@ -94,6 +94,7 @@ final class MedalModuleModel: ObservableObject {
 struct MedalModuleView: View {
     @StateObject private var model: MedalModuleModel
     @State private var pendingPush: ProfileDestination?
+    @Namespace private var zoomNS
 
     init(memberId: String, moduleId: String, moduleName: String, tabName: String) {
         _model = StateObject(
@@ -106,51 +107,73 @@ struct MedalModuleView: View {
         )
     }
 
+    private var unlockedCount: Int { model.items.filter { $0.unlocked }.count }
+
+    private var headerSubtitle: String {
+        let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = model.moduleName.isEmpty ? "勋章馆" : model.moduleName
+        return artist.isEmpty ? base : "\(artist)的\(base)"
+    }
+
     var body: some View {
-        DetailScroll {
-            MemberHeaderBar(
-                name: model.member.title,
-                pic: model.member.pic,
-                subtitle: "勋章馆 · \(Fmt.cleanTabName(model.tabName))"
-            )
+        List {
+            Section {
+                MemberSectionHeader(
+                    title: model.member.title,
+                    pic: model.member.pic,
+                    subtitle: headerSubtitle,
+                    count: "\(unlockedCount)/\(model.items.count)",
+                    unit: "枚"
+                )
+                .listRowInsets(EdgeInsets())
+            }
+            .listRowBackground(Color.clear)
 
             if model.loading {
                 StateNotice(title: "正在读取模块…", progress: true)
+                    .listRowBackground(Color.clear)
             } else if let error = model.error {
                 StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
+                .listRowBackground(Color.clear)
             } else if model.items.isEmpty {
                 StateNotice(title: "这个模块还没有勋章")
+                    .listRowBackground(Color.clear)
             } else {
-                MedalTileGrid(items: model.items) { item in
-                    if let route = model.openTile(item) {
-                        pendingPush = route
-                    }
-                }
-
-                if model.hasNext {
-                    Button {
-                        Task { await model.loadMore() }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if model.loadingMore { ProgressView() }
-                            Text(model.loadingMore ? "正在加载…" : "加载更多")
-                                .font(.system(size: 14, weight: .medium))
+                Section {
+                    ZoomedMedalTileGrid(items: model.items, zoomNamespace: zoomNS) { item in
+                        if let route = model.openTile(item) {
+                            pendingPush = route
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(model.loadingMore)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+
+                    if model.hasNext {
+                        Button {
+                            Task { await model.loadMore() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if model.loadingMore { ProgressView() }
+                                Text(model.loadingMore ? "正在加载…" : "加载更多")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .disabled(model.loadingMore)
+                    }
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .sheet(item: $model.sheetTarget) { target in
-            MedalDetailSheet(memberId: model.memberId, target: target)
+            MedalDetailSheet(memberId: model.memberId, target: target, zoomNamespace: zoomNS)
         }
         .navigationDestination(isPresented: Binding(
             get: { pendingPush != nil },
