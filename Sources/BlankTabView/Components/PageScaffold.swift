@@ -37,7 +37,7 @@ struct PageScaffold<Content: View, Trailing: View>: View {
         .background(background.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
-        .toolbarTitleAlignment(.leading)
+        .toolbarTitleLeading()
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -69,6 +69,23 @@ extension PageScaffold where Trailing == EmptyView {
         @ViewBuilder content: () -> Content
     ) {
         self.init(title: title, background: background, scroll: scroll, trailing: { EmptyView() }, content: content)
+    }
+}
+
+/// iOS 27.2 才有的标题对齐 API：在该版本以下保持系统默认。
+private struct ToolbarTitleLeading: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 27.2, *) {
+            content.toolbarTitleAlignment(.leading)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func toolbarTitleLeading() -> some View {
+        modifier(ToolbarTitleLeading())
     }
 }
 
