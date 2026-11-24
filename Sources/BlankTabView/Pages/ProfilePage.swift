@@ -85,7 +85,6 @@ struct ProfilePage: View {
                 weekHonor: { model.weekHonor(of: $0) },
                 onTapWeek: tap(MemberEntries.rank(metrics, monthly: false)),
                 onTapMonth: tap(MemberEntries.rank(metrics, monthly: true)),
-                onTapSkin: nil,
                 onTapSkins: tap(MemberEntries.skins(metrics)),
                 onTapMedals: tap(MemberEntries.medals(metrics)),
                 onTapFamily: { path.append(MemberEntries.family($0)) }
