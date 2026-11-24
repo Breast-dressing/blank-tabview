@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（默认半屏固定高度、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生 sheet（默认半屏固定高度、禁用液态玻璃、隐藏抓手、内容不滚动）。
 /// 标题栏显示皮肤名字；正文「限定编号 → 获取日期 + 人数已获得」。
 struct SkinDetailSheet: View {
     let skin: SkinItem
@@ -27,28 +27,26 @@ struct SkinDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    imageView
+            VStack(alignment: .leading, spacing: 14) {
+                imageView
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        // 原来是皮肤名字的位置，换成限定编号，字号字重不变。
-                        Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
-                            .font(.system(size: 19, weight: .bold))
+                VStack(alignment: .leading, spacing: 4) {
+                    // 原来是皮肤名字的位置，换成限定编号，字号字重不变。
+                    Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
+                        .font(.system(size: 19, weight: .bold))
 
-                        HStack(spacing: 8) {
-                            if !skin.unlockedDate.isEmpty {
-                                Text(skin.unlockedDate)
-                            }
-                            Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
+                    HStack(spacing: 8) {
+                        if !skin.unlockedDate.isEmpty {
+                            Text(skin.unlockedDate)
                         }
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
                     }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -72,7 +70,7 @@ struct SkinDetailSheet: View {
         // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
         .presentationBackground(Color(uiColor: .systemGroupedBackground))
         .presentationCornerRadius(36)
-        .zoomNavigationTransitionIfAvailable(id: "\(skin.id)-pic", in: zoomNamespace)
+        .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
 
     /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
@@ -110,25 +108,5 @@ extension Color {
         let green = Double((value >> 8) & 0xFF) / 255
         let blue = Double(value & 0xFF) / 255
         self = Color(red: red, green: green, blue: blue)
-    }
-}
-
-/// iOS 18+ zoom 过渡；没有 namespace 时原样返回。
-private struct ZoomNavigationIfAvailable: ViewModifier {
-    let id: String
-    let namespace: Namespace.ID?
-
-    func body(content: Content) -> some View {
-        if let namespace {
-            content.navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else {
-            content
-        }
-    }
-}
-
-extension View {
-    func zoomNavigationTransitionIfAvailable(id: String, in namespace: Namespace.ID?) -> some View {
-        modifier(ZoomNavigationIfAvailable(id: id, namespace: namespace))
     }
 }

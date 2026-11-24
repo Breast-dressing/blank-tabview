@@ -12,6 +12,7 @@ struct SkinSeriesGroup: Identifiable {
     let categKey: String
 
     var id: String { name }
+    var unlockedCount: Int { skins.filter { $0.isUnlocked }.count }
 }
 
 // MARK: - Model
@@ -42,6 +43,17 @@ final class SkinsModel: ObservableObject {
     }
 
     func stop() { flag.on = false }
+
+    var displayTotal: Int { total > 0 ? total : skins.count }
+
+    /// 头部副标题：「艺人名字」+「的乐迷皮肤」。
+    var headerSubtitle: String {
+        let artist = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !artist.isEmpty { return "\(artist)的乐迷皮肤" }
+        let fallback = member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !fallback.isEmpty { return "\(fallback)的乐迷皮肤" }
+        return "乐迷皮肤"
+    }
 
     func load() async {
         let cached = services.medals.cachedSkins(medalId)
@@ -120,55 +132,51 @@ struct SkinsView: View {
     var body: some View {
         List {
             Section {
-                skinHeader
+                MemberSectionHeader(
+                    title: model.member.title,
+                    pic: model.member.pic,
+                    subtitle: model.headerSubtitle,
+                    count: "\(model.displayTotal)",
+                    unit: "款"
+                )
+                .listRowInsets(EdgeInsets())
             }
             .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
 
             if model.groups.isEmpty {
-                if model.scanning {
-                    StateNotice(title: "正在深度扫描乐迷皮肤…", progress: true)
-                } else {
-                    StateNotice(title: "未找到乐迷皮肤数据", message: model.error)
-                }
+                stateRow
             } else {
                 ForEach(model.groups) { group in
                     Section {
-                        NavigationLink(value: ProfileDestination.skinSeries(seriesName: group.name, skins: group.skins)) {
+                        NavigationLink(value: route(for: group)) {
                             HStack(spacing: 6) {
                                 Text(group.name)
                                     .font(.system(size: 16, weight: .semibold))
                                 Spacer(minLength: 8)
-                                Text("\(unlockedCount(of: group))/\(group.skins.count)")
-                                    .font(.system(size: 14, weight: .regular))
+                                Text("\(group.unlockedCount)/\(group.skins.count)")
+                                    .font(.system(size: 14))
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .listRowSeparator(.hidden)
 
-                        SkinTileGrid(
-                            items: Array(group.skins.prefix(3)),
-                            zoomNamespace: zoomNS
-                        ) { skin in
+                        SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
                             selectedSeries = group.name
                             selectedSkin = skin
                         }
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 14, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                        .listRowSeparator(.hidden)
                     }
                 }
 
                 if model.scanning {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("正在深度扫描乐迷皮肤…")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    .listRowBackground(Color.clear)
+                    scanningRow
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -183,46 +191,41 @@ struct SkinsView: View {
         }
     }
 
-    private func unlockedCount(of group: SkinSeriesGroup) -> Int {
-        group.skins.filter { $0.isUnlocked }.count
+    private func route(for group: SkinSeriesGroup) -> ProfileDestination {
+        .skinSeries(
+            member: model.member,
+            artistName: model.artistName,
+            seriesName: group.name,
+            skins: group.skins
+        )
     }
 
-    /// 头部直接铺在页面里（不套卡片）：48 头像 + 名字 / 勋章名 + 右侧皮肤数量。
-    /// 名字与数量字号沿用「我的」卡片的字重（bold）。
-    private var skinHeader: some View {
-        HStack(alignment: .center, spacing: 10) {
-            AvatarCircle(urlString: model.member.pic, size: 48)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.member.title.isEmpty ? "未知成员" : model.member.title)
-                    .font(.system(size: 17, weight: .bold))
-                    .lineLimit(1)
-                Text(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
-                    .font(.system(size: 17, weight: .bold))
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(model.total > 0 ? model.total : model.skins.count)")
-                        .font(.system(size: 20, weight: .bold))
-                    Text("款")
-                        .font(.footnote)
-                }
-                Text("已获得")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+    @ViewBuilder
+    private var stateRow: some View {
+        if model.scanning {
+            StateNotice(title: "正在深度扫描乐迷皮肤…", progress: true)
+                .listRowBackground(Color.clear)
+        } else {
+            StateNotice(title: "未找到乐迷皮肤数据", message: model.error)
+                .listRowBackground(Color.clear)
         }
+    }
+
+    private var scanningRow: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+            Text("正在深度扫描乐迷皮肤…")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .listRowBackground(Color.clear)
     }
 }
 
-/// 皮肤卡：大圆角卡片，不铺底色；未解锁时去色压暗；加载中在整卡中心显示系统 ProgressView。
+/// 皮肤卡：透明圆角矩形包住图片 / 名字 / 日期，同时作为 zoom 过渡的出发点。
 struct SkinTileCell: View {
     let skin: SkinItem
-    var zoomNamespace: Namespace.ID? = nil
     @State private var image: UIImage?
-
-    private let radius: CGFloat = 24
 
     var body: some View {
         VStack(spacing: 6) {
@@ -233,15 +236,14 @@ struct SkinTileCell: View {
                         .scaledToFit()
                         .saturation(skin.isUnlocked ? 1 : 0)
                         .opacity(skin.isUnlocked ? 1 : 0.55)
-                        .matchedTransitionSourceIfAvailable(id: "\(skin.id)-pic", in: zoomNamespace)
                 } else {
                     ProgressView()
                 }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 86)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .task(id: skin.pic) {
                 image = await RemoteImageLoader.image(for: skin.pic)
             }
@@ -255,11 +257,12 @@ struct SkinTileCell: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .frame(height: 13)
         }
     }
 }
 
-/// 皮肤三列格。
+/// 皮肤三列格。整块（图片 + 名字 + 日期）包在透明圆角矩形里，zoom 挂在这块矩形上。
 struct SkinTileGrid: View {
     let items: [SkinItem]
     var zoomNamespace: Namespace.ID? = nil
@@ -268,14 +271,20 @@ struct SkinTileGrid: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
             ForEach(items, id: \.self) { skin in
                 Button {
                     onTap(skin)
                 } label: {
-                    SkinTileCell(skin: skin, zoomNamespace: zoomNamespace)
+                    SkinTileCell(skin: skin)
+                        .padding(6)
                 }
                 .buttonStyle(.plain)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.clear)
+                )
+                .matchedTransitionSourceIfAvailable(id: skin.id, in: zoomNamespace)
             }
         }
     }
@@ -284,25 +293,5 @@ struct SkinTileGrid: View {
 #Preview {
     NavigationStack {
         SkinsView(memberId: "12345", medalId: "3069960", medalName: "虞书欣乐迷", scheme: "")
-    }
-}
-
-/// iOS 18+ 的 zoom 过渡源；没有 namespace 时原样返回。
-private struct MatchedSourceIfAvailable: ViewModifier {
-    let id: String
-    let namespace: Namespace.ID?
-
-    func body(content: Content) -> some View {
-        if let namespace {
-            content.matchedTransitionSource(id: id, in: namespace)
-        } else {
-            content
-        }
-    }
-}
-
-extension View {
-    func matchedTransitionSourceIfAvailable(id: String, in namespace: Namespace.ID?) -> some View {
-        modifier(MatchedSourceIfAvailable(id: id, namespace: namespace))
     }
 }

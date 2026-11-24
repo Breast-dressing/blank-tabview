@@ -1,42 +1,68 @@
 import SwiftUI
 
+/// 系列详情：顶部成员信息（头像 / 名字 / 「艺人名字的系列名」/ 右侧该系列已获得），下面三列皮肤。
 struct SkinSeriesView: View {
+    let member: Member
+    let artistName: String
     let seriesName: String
     let skins: [SkinItem]
 
     @State private var selectedSkin: SkinItem?
-    @State private var selectedSeries = ""
+    @Namespace private var zoomNS
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+    private var unlockedCount: Int { skins.filter { $0.isUnlocked }.count }
+
+    private var headerSubtitle: String {
+        let artist = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = artist.isEmpty ? fallback : artist
+        return name.isEmpty ? seriesName : "\(name)的\(seriesName)"
+    }
 
     var body: some View {
-        DetailScroll {
-            Text("\(seriesName) · 共 \(skins.count) 款")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+        List {
+            Section {
+                MemberSectionHeader(
+                    title: member.title,
+                    pic: member.pic,
+                    subtitle: headerSubtitle,
+                    count: "\(unlockedCount)",
+                    unit: "款"
+                )
+                .listRowInsets(EdgeInsets())
+            }
+            .listRowBackground(Color.clear)
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                ForEach(skins.sorted { $0.seq < $1.seq }, id: \.self) { skin in
-                    Button {
-                        selectedSeries = seriesName
+            Section {
+                if skins.isEmpty {
+                    StateNotice(title: "这个系列还没有皮肤")
+                        .listRowBackground(Color.clear)
+                } else {
+                    SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
                         selectedSkin = skin
-                    } label: {
-                        SkinTileCell(skin: skin)
                     }
-                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                    .listRowSeparator(.hidden)
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle(seriesName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedSkin) { skin in
-            SkinDetailSheet(skin: skin, seriesName: selectedSeries, uin: "")
+            SkinDetailSheet(
+                skin: skin,
+                seriesName: seriesName,
+                uin: member.itemId.isEmpty ? "" : member.itemId,
+                zoomNamespace: zoomNS
+            )
         }
     }
 }
 
 #Preview {
     NavigationStack {
-        SkinSeriesView(seriesName: "系列 3", skins: [])
+        SkinSeriesView(member: Member(), artistName: "虞书欣", seriesName: "系列 3", skins: [])
     }
 }
