@@ -11,11 +11,9 @@ struct RootTabView: View {
             Tab(AppTab.profile.title, systemImage: AppTab.profile.systemImage, value: .profile) {
                 ProfilePage()
             }
-            // 搜索为分离式 Tab（role: .search）
+            // 搜索：系统分离式搜索 Tab（role: .search，由系统提供默认图标与尾部固定位）
             Tab(value: AppTab.search, role: .search) {
                 SearchPage()
-            } label: {
-                Label(AppTab.search.title, systemImage: AppTab.search.systemImage)
             }
         }
     }
