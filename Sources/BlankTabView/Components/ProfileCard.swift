@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// 票据卡的几何参数，全部对齐 Flutter 原版 `MemberTicketCard`：
-/// 头像 80、头像与卡面缺口间隙 6、缺口倒角 8、卡面圆角 28、卡片顶部留白 20。
+/// 头像 80、头像与卡面缺口间隙 6、缺口倒角 8、卡面圆角 28。
 /// 头像圆心：距卡片左边 = 半径 - 4 = 36，距卡片顶部 = 半径 - 6 = 34。
+/// 左右两侧虚线处的半圆缺口与头像缺口的倒角共用 `sideNotchRadius` 这一个变量。
 enum ProfileCardMetrics {
     static let cornerRadius: CGFloat = 28
     static let avatarSize: CGFloat = 80
@@ -11,8 +12,15 @@ enum ProfileCardMetrics {
     static let gap: CGFloat = 6
     /// 缺口与顶边 / 左边交接处的倒角
     static let cutCorner: CGFloat = 8
-    /// 卡片顶部留白（头像上探出卡片的距离从这里出）
-    static let cardTopInset: CGFloat = 20
+
+    /// 左右两侧虚线处半圆缺口的半径（与头像缺口倒角同值，统一引用这一个变量）
+    static let sideNotchRadius: CGFloat = cutCorner
+    /// 半圆缺口直径
+    static var sideNotchDiameter: CGFloat { sideNotchRadius * 2 }
+
+    /// 卡片顶部留白：正好等于头像上探出卡片的高度，不留额外间隙
+    static var cardTopInset: CGFloat { -avatarOffsetY }
+
     static let avatarCenterX: CGFloat = avatarRadius - 4
     static let avatarCenterY: CGFloat = avatarRadius - 6
     static let avatarOffsetX: CGFloat = avatarCenterX - avatarRadius
@@ -22,8 +30,11 @@ enum ProfileCardMetrics {
 }
 
 /// 票面轮廓：圆角矩形左上角被“头像 + 间隙”的圆咬出缺口，
-/// 缺口与顶边 / 左边交接处用 8pt 圆角倒角，卡内内容按同一边界裁剪。
+/// 缺口与顶边 / 左边交接处用 8pt 圆角倒角；虚线处左右两边各被半圆咬开。
 struct ProfileTicketShape: Shape {
+    /// 虚线位置（卡片坐标系，nil / 0 时不挖侧面半圆）
+    var notchY: CGFloat = 0
+
     func path(in rect: CGRect) -> Path {
         let corner = ProfileCardMetrics.cornerRadius
         let f = ProfileCardMetrics.cutCorner
@@ -31,6 +42,8 @@ struct ProfileTicketShape: Shape {
         let cx = ProfileCardMetrics.avatarCenterX
         let cy = ProfileCardMetrics.avatarCenterY
         let d = r + f
+        let sideNotch = ProfileCardMetrics.sideNotchRadius
+        let hasSideNotch = notchY > sideNotch && notchY < rect.height - sideNotch
 
         // 倒角圆心：位于顶边 / 左边上，到缺口圆心的距离 = 缺口半径 + 倒角半径
         let topCenter = CGPoint(
@@ -79,11 +92,21 @@ struct ProfileTicketShape: Shape {
         if leftSweep > 0 { leftSweep -= 2 * .pi }
         appendArc(&path, center: leftCenter, radius: f, start: leftStart, sweep: leftSweep)
 
-        // 左边 → 左下 → 底边 → 右下 → 右边 → 右上，与起点闭合
+        // 左边向下：先经过虚线处的半圆缺口
+        if hasSideNotch {
+            path.addLine(to: CGPoint(x: 0, y: notchY - sideNotch))
+            appendArc(&path, center: CGPoint(x: 0, y: notchY), radius: sideNotch, start: -.pi / 2, sweep: .pi)
+        }
         path.addLine(to: CGPoint(x: 0, y: rect.height - corner))
         appendArc(&path, center: CGPoint(x: corner, y: rect.height - corner), radius: corner, start: .pi, sweep: -.pi / 2)
         path.addLine(to: CGPoint(x: rect.width - corner, y: rect.height))
         appendArc(&path, center: CGPoint(x: rect.width - corner, y: rect.height - corner), radius: corner, start: .pi / 2, sweep: -.pi / 2)
+
+        // 右边向上：同样在虚线处挖半圆
+        if hasSideNotch {
+            path.addLine(to: CGPoint(x: rect.width, y: notchY + sideNotch))
+            appendArc(&path, center: CGPoint(x: rect.width, y: notchY), radius: sideNotch, start: .pi / 2, sweep: .pi)
+        }
         path.addLine(to: CGPoint(x: rect.width, y: corner))
         appendArc(&path, center: CGPoint(x: rect.width - corner, y: corner), radius: corner, start: 0, sweep: -.pi / 2)
         path.closeSubpath()
@@ -129,7 +152,7 @@ struct AvatarCircle: View {
 }
 
 #Preview {
-    ProfileTicketShape()
+    ProfileTicketShape(notchY: 120)
         .fill(Color(uiColor: .secondarySystemGroupedBackground))
         .frame(height: 220)
         .padding(20)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 我的：标题在左上角；下方是带圆形凸起的票据卡，数据来自 QQ 音乐家族 / 勋章接口。
+/// 我的：标题在导航栏左侧；成员票据卡直接贴导航栏下方，不再自加间距。
 /// 票据卡四项数据与家族格可点进详情页（入口规则集中在 MemberEntries）。
 struct ProfilePage: View {
     @StateObject private var model = ProfileViewModel()
@@ -16,8 +16,6 @@ struct ProfilePage: View {
             ) {
                 VStack(alignment: .leading, spacing: 16) {
                     cardSlot
-                        // 给头像凸起预留上方空间，避免和标题挤在一起
-                        .padding(.top, 10)
 
                     if let metrics = model.metrics, model.error == nil {
                         ProfileDetailSection(
@@ -35,7 +33,6 @@ struct ProfilePage: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ProfileDestination.self) { route in
                 destination(for: route)
             }
@@ -86,7 +83,6 @@ struct ProfilePage: View {
             )
         } else if model.loading {
             ProfileStateCard(title: "正在读取成员数据…", showsProgress: true)
-                .padding(.top, 8)
         } else {
             ProfileStateCard(
                 title: "还没有当前成员",
@@ -94,7 +90,6 @@ struct ProfilePage: View {
                 actionTitle: "添加家族",
                 action: { showSettings = true }
             )
-            .padding(.top, 8)
         }
     }
 

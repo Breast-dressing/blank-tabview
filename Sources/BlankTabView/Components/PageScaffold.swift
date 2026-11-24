@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 统一页面骨架：顶部左侧标题 + 内容。内容多时传 scroll: true。
+/// 统一页面骨架：标题交给导航栏（大标题，左上角），内容直接接在工具栏下面。
 struct PageScaffold<Content: View>: View {
     let title: String
     let background: Color
@@ -31,18 +31,19 @@ struct PageScaffold<Content: View>: View {
             }
         }
         .background(background.ignoresSafeArea())
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
     }
 
     private var stack: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageTitle(text: title)
             content
             if !scroll {
                 Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
+        .padding(.top, 0)
         .padding(.bottom, scroll ? 24 : 0)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(maxHeight: scroll ? nil : .infinity, alignment: .topLeading)
@@ -56,5 +57,7 @@ extension PageScaffold where Content == EmptyView {
 }
 
 #Preview {
-    PageScaffold(title: "首页")
+    NavigationStack {
+        PageScaffold(title: "首页")
+    }
 }
