@@ -1,3 +1,6 @@
+import Charts
+import SwiftUI
+
 /// 近 N 天荣誉柱状图。
 struct DailyBars: View {
     let values: [Double]
