@@ -11,8 +11,8 @@ struct RootTabView: View {
             Tab(AppTab.profile.title, systemImage: AppTab.profile.systemImage, value: .profile) {
                 ProfilePage()
             }
-            // 分离式搜索 Tab：由系统放在尾部、选中后变形为搜索态
-            Tab(value: AppTab.search, role: .search) {
+            // 分离式搜索 Tab：iOS 27 的 prominent 角色把标签页放到末尾的独立位置
+            Tab(value: AppTab.search, role: .prominent) {
                 SearchPage()
             } label: {
                 Label(AppTab.search.title, systemImage: AppTab.search.systemImage)
