@@ -109,12 +109,7 @@ struct SkinsView: View {
 
     var body: some View {
         DetailScroll {
-            MemberHeaderBar(
-                name: model.member.title,
-                pic: model.member.pic,
-                subtitle: subtitle,
-                trailing: "\(model.skins.count)"
-            )
+            skinHeader
 
             if model.groups.isEmpty {
                 if model.scanning {
@@ -146,11 +141,31 @@ struct SkinsView: View {
         }
     }
 
-    private var subtitle: String {
-        var parts: [String] = []
-        if !model.artistName.isEmpty { parts.append(model.artistName) }
-        parts.append("共 \(model.skins.count) 款皮肤")
-        return parts.joined(separator: " · ")
+    /// 头部直接铺在页面里（不套卡片）：40 头像 + 名字 / 勋章名 + 右侧皮肤数量。
+    private var skinHeader: some View {
+        HStack(alignment: .center, spacing: 10) {
+            AvatarCircle(urlString: model.member.pic, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.member.title.isEmpty ? "未知成员" : model.member.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
+                    .font(.headline)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(model.skins.count)")
+                        .font(.title3)
+                    Text("枚")
+                        .font(.subheadline)
+                }
+                Text("已获得")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func seriesCard(_ group: SkinSeriesGroup) -> some View {
@@ -178,17 +193,12 @@ struct SkinsView: View {
     }
 }
 
-/// 皮肤卡：大圆角卡片，直接展示接口给的 `pic`，不铺任何底色；
-/// 加载中在整张卡片中心显示系统 `ProgressView`（官方转圈），无淡入 / 缩放等动画。
+/// 皮肤卡：大圆角卡片，不铺底色；加载中在整卡中心显示系统 ProgressView（无淡入动画）。
 struct SkinTileCell: View {
     let skin: SkinItem
     @State private var image: UIImage?
 
-    /// 卡片大圆角
     private let radius: CGFloat = 24
-    private var corner: RoundedRectangle {
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-    }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -203,8 +213,8 @@ struct SkinTileCell: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 86)
-            .clipShape(corner)
-            .contentShape(corner)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .task(id: skin.pic) {
                 image = await RemoteImageLoader.image(for: skin.pic)
             }
