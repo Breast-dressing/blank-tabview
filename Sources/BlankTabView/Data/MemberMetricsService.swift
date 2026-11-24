@@ -11,15 +11,13 @@ struct RankSummary: Sendable {
 /// 成员资料缺失时先去家族成员里补，不把“未知”展示给用户。
 final class MemberMetricsService: @unchecked Sendable {
     private let store: AppStore
-    private let api: QqApi
     private let families: FamilyRepository
     private let honors: HonorRepository
     private let medals: MedalRepository
     private var cache: [String: MemberMetrics] = [:]
 
-    init(store: AppStore, api: QqApi, families: FamilyRepository, honors: HonorRepository, medals: MedalRepository) {
+    init(store: AppStore, families: FamilyRepository, honors: HonorRepository, medals: MedalRepository) {
         self.store = store
-        self.api = api
         self.families = families
         self.honors = honors
         self.medals = medals
@@ -46,7 +44,7 @@ final class MemberMetricsService: @unchecked Sendable {
     }
 
     /// 成员资料补全（唯一入口）：缓存 → 内存成员 → 逐个家族拉取。
-    /// 「我的」页与成员详情都走这里，避免两边各写一份解析 / 回退。
+    /// 「我的」页与成员详情都走这里，不各写一份。
     func ensureMember(_ itemId: String) async -> Member? {
         guard !itemId.isEmpty else { return nil }
         if let cached = cachedMember(itemId), !cached.title.isEmpty {
@@ -54,8 +52,7 @@ final class MemberMetricsService: @unchecked Sendable {
         }
 
         let repo = families
-        let familyList = repo.families
-        for family in familyList {
+        for family in repo.families {
             let members = (try? await repo.loadMembers(family)) ?? []
             if let hit = members.first(where: { $0.itemId == itemId }) {
                 store.saveMemberInfo(hit, familyId: family.id)
@@ -79,10 +76,15 @@ final class MemberMetricsService: @unchecked Sendable {
     }
 
     private func build(_ itemId: String) async throws -> MemberMetrics {
-        let member = store.memberInfo(itemId)
-            ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member
-            ?? await ensureMember(itemId)
-            ?? Member(itemId: itemId, title: "未知")
+        let member: Member
+        if let cached = store.memberInfo(itemId)
+            ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member {
+            member = cached
+        } else if let ensured = await ensureMember(itemId) {
+            member = ensured
+        } else {
+            member = Member(itemId: itemId, title: "未知")
+        }
 
         let family = families.familyOfMember(itemId, hintFamilyId: member.familyId)
         var metrics = MemberMetrics(member: member, familyName: family?.name ?? "")

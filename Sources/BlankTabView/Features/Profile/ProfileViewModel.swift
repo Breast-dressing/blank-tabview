@@ -18,7 +18,16 @@ final class ProfileViewModel: ObservableObject {
     func load(force: Bool = false) async {
         families = services.families.families
         let raw = services.store.selectedMemberId
-        let resolved = (raw?.isEmpty == false) ? raw : nil
+        var resolved = (raw?.isEmpty == false) ? raw : nil
+
+        // 没手动选过成员时，若仅有一个家族成员就自动选上，避免“我的”页空白
+        if resolved == nil {
+            let cached = services.families.allMembersCached()
+            if cached.count == 1, !cached[0].member.itemId.isEmpty {
+                services.store.setSelectedMember(cached[0].member.itemId)
+                resolved = cached[0].member.itemId
+            }
+        }
 
         let changed = resolved != lastMemberId
         lastMemberId = resolved

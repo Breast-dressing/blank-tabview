@@ -21,7 +21,6 @@ final class AppServices: @unchecked Sendable {
         let medals = MedalRepository(store: store, api: api)
         let metrics = MemberMetricsService(
             store: store,
-            api: api,
             families: families,
             honors: honors,
             medals: medals
