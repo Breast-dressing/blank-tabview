@@ -3,8 +3,8 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（默认半屏固定高度、禁用液态玻璃、隐藏抓手、内容不滚动）。
-/// 标题栏显示皮肤名字；正文「限定编号 → 获取日期 + 人数已获得」。
+/// 单个皮肤详情：原生 sheet（内容不滚动、高度贴合内容、禁用液态玻璃、隐藏抓手）。
+/// 图片贴着工具栏、文本贴着图片底部，左右与底部留白一致。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -27,7 +27,7 @@ struct SkinDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
                 imageView
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -45,7 +45,8 @@ struct SkinDetailSheet: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
@@ -65,7 +66,8 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        // 内容高度就是弹窗高度，底部不留空白。
+        .presentationSizing(.fitted)
         .presentationDragIndicator(.hidden)
         // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
         .presentationBackground(Color(uiColor: .systemGroupedBackground))
@@ -73,7 +75,7 @@ struct SkinDetailSheet: View {
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
 
-    /// 大圆角卡片直接展示接口给的大图，不铺底色；加载中在整卡中心显示系统 ProgressView。
+    /// 大图直接贴着工具栏，圆角裁剪，加载中在中心显示系统 ProgressView。
     private var imageView: some View {
         ZStack {
             if let image {
@@ -86,8 +88,8 @@ struct SkinDetailSheet: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .task(id: skin.pic) {
             image = await RemoteImageLoader.image(for: skin.pic)
         }

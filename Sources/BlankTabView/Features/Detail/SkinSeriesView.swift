@@ -29,7 +29,7 @@ struct SkinSeriesView: View {
                     count: "\(unlockedCount)",
                     unit: "款"
                 )
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
             .listRowBackground(Color.clear)
 
