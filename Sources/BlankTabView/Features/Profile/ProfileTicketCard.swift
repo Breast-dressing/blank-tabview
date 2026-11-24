@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// 票据卡：头像压在卡片左上角，卡内是成员信息 / 四项数据 / 虚线 / 家族四等分。
-/// 四项数据与家族格都可以点进详情页；「管理」仍进设置页。
+/// 票据卡：头像压在卡片左上角，卡面被头像咬出缺口（头像与缺口间留页面底色间隙，无白边），
+/// 卡内是成员信息 / 四项数据 / 虚线 / 家族四等分。
+/// 几何参数对齐 Flutter 原版：头像 80、间隙 6、倒角 8、圆角 28、卡顶留白 20。
 struct ProfileTicketCard: View {
     let metrics: MemberMetrics
     let families: [Family]
@@ -18,9 +19,9 @@ struct ProfileTicketCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-                .padding(.leading, ProfileCardMetrics.lobeDiameter + 4)
+                .padding(.leading, ProfileCardMetrics.headerLeading)
                 .padding(.trailing, 18)
-                .padding(.top, 18)
+                .padding(.top, 14)
 
             statsRow
                 .padding(.top, 14)
@@ -35,12 +36,19 @@ struct ProfileTicketCard: View {
                 .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { ProfileCardBackground() }
+        .background { ProfileTicketShape().fill(Color(uiColor: .secondarySystemGroupedBackground)) }
+        .clipShape(ProfileTicketShape())
         .overlay(alignment: .topLeading) {
-            AvatarCircle(urlString: member.pic)
-                .offset(x: ProfileCardMetrics.avatarOffset, y: ProfileCardMetrics.avatarOffset)
-                .accessibilityLabel("头像")
+            AvatarCircle(
+                urlString: member.pic,
+                size: ProfileCardMetrics.avatarSize,
+                showsRing: false
+            )
+            .offset(x: ProfileCardMetrics.avatarOffsetX, y: ProfileCardMetrics.avatarOffsetY)
+            .accessibilityLabel("头像")
         }
+        // 卡片顶部留白：头像上探出卡片的部分、以及缺口处的页面底色都从这里出
+        .padding(.top, ProfileCardMetrics.cardTopInset)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("成员资料卡")
     }
