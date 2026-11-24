@@ -24,11 +24,17 @@ final class FamilyDetailModel: ObservableObject {
     var currentFamily: Family {
         services.families.families.first { $0.id == family.id } ?? family
     }
+    
+    /// 总荣誉：接口原文直出，不做任何处理。
+    var honorText: String {
+        let honor = currentFamily.honor
+        return honor.isEmpty ? "--" : honor
+    }
 
     func load() async {
         loading = true
         error = nil
-        if Fmt.parseNumber(currentFamily.honor) <= 0 {
+        if FamilyRepository.hasHonor(currentFamily) == false {
             _ = await services.families.refreshStats(family)
         }
         let serviceRef = services
@@ -56,8 +62,6 @@ final class FamilyDetailModel: ObservableObject {
         dayValues = Array(values.suffix(7))
         hasHonorData = totals.hasData
     }
-
-    var honorText: String { services.stats.honorText(currentFamily) }
 
     var topMembers: [Member] { Array(members.prefix(5)) }
 
@@ -238,7 +242,7 @@ struct FamilyDetailView: View {
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                         Spacer()
-                        Text("荣誉 \(Fmt.thousands(member.honor))")
+                        Text("荣誉 \(member.honor)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                         Plate(text: "未达标", filled: true)
@@ -279,7 +283,7 @@ struct MemberSimpleRow: View {
                 }
             }
             Spacer(minLength: 6)
-            Text("荣誉 \(Fmt.thousands(member.honor))")
+            Text("荣誉 \(member.honor)")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()

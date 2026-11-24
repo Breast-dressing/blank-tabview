@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// 「我的」页的状态机：选中成员 → 补全成员资料 → 拉指标 → 荣誉分组；不依赖 UI。
-/// 选中 ID 一律经 `MemberId.canonical` 归一化；家族荣誉统一走 `FamilyStatsService`。
+/// 选中 ID 一律经 `MemberId.canonical` 归一化；家族本周荣誉统一走 `FamilyStatsService`。
 @MainActor
 final class ProfileViewModel: ObservableObject {
     private let services = AppServices.shared
@@ -73,19 +73,14 @@ final class ProfileViewModel: ObservableObject {
         loading = false
     }
 
-    /// 家族页里总荣誉缺失（旧数据 / 分享链接）时补拉一次详情，避免卡片一直是 0。
+    /// 家族页里总荣誉缺失（旧数据 / 分享链接）时补拉一次详情，避免卡片一直是空。
     private func refreshFamilyStatsIfNeeded(force: Bool = false) async {
         let current = services.families.families
         guard force || !refreshedFamilyStats else { return }
         refreshedFamilyStats = true
-        for family in current where Fmt.parseNumber(family.honor) <= 0 {
+        for family in current where FamilyRepository.hasHonor(family) == false {
             _ = await services.families.refreshStats(family)
         }
-    }
-
-    /// 家族总荣誉展示（唯一来源）。
-    func honorText(of family: Family) -> String {
-        services.stats.honorText(family)
     }
 
     /// 家族本周荣誉值（唯一来源）。

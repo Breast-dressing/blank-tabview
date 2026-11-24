@@ -2,12 +2,11 @@ import SwiftUI
 
 /// 票据卡：头像压在卡片左上角，卡面被头像咬出缺口（头像与缺口间留页面底色间隙，无白边），
 /// 虚线处左右两侧再各挖一个半圆缺口；半圆半径与头像缺口倒角共用 `ProfileCardMetrics.sideNotchRadius`。
+/// 家族荣誉直接展示接口原文，不做任何数字处理；「管理」已上移到页面工具栏。
 struct ProfileTicketCard: View {
     let metrics: MemberMetrics
     let families: [Family]
-    let honorText: (Family) -> String
     let weekHonor: (Family) -> Double
-    let onManage: () -> Void
     var onTapWeek: (() -> Void)?
     var onTapMonth: (() -> Void)?
     var onTapSkins: (() -> Void)?
@@ -162,28 +161,15 @@ struct ProfileTicketCard: View {
 
     private var familySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("家族")
-                    .font(.system(size: 18, weight: .bold))
-                Spacer()
-                Button(action: onManage) {
-                    HStack(spacing: 2) {
-                        Text("管理").font(.system(size: 13, weight: .medium))
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
+            Text("家族")
+                .font(.system(size: 18, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if families.isEmpty {
-                Button(action: onManage) {
-                    Text("还没有家族，点击这里添加")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
+                Text("还没有家族，去右上角设置里添加")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(alignment: .top, spacing: 4) {
                     ForEach(families.prefix(4)) { family in
@@ -215,7 +201,8 @@ struct ProfileTicketCard: View {
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(honorText(family))
+                    // 接口原文直出，不截数字、不做千分位
+                    Text(family.honor.isEmpty ? "--" : family.honor)
                         .font(.system(size: 17, weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 我的：标题在导航栏左侧；成员票据卡直接贴导航栏下方，不再自加间距。
+/// 我的：系统大标题；工具栏右侧齿轮进设置。成员票据卡直接贴标题下方，不再自加间距。
 /// 票据卡四项数据与家族格可点进详情页（入口规则集中在 MemberEntries）。
 struct ProfilePage: View {
     @StateObject private var model = ProfileViewModel()
@@ -31,6 +31,16 @@ struct ProfilePage: View {
                             action: { Task { await model.load(force: true) } }
                         )
                     }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("设置")
                 }
             }
             .navigationDestination(for: ProfileDestination.self) { route in
@@ -73,9 +83,7 @@ struct ProfilePage: View {
             ProfileTicketCard(
                 metrics: metrics,
                 families: model.families,
-                honorText: { model.honorText(of: $0) },
                 weekHonor: { model.weekHonor(of: $0) },
-                onManage: { showSettings = true },
                 onTapWeek: tap(MemberEntries.rank(metrics, monthly: false)),
                 onTapMonth: tap(MemberEntries.rank(metrics, monthly: true)),
                 onTapSkins: tap(MemberEntries.skins(metrics)),
