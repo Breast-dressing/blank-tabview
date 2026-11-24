@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ui-screenshot-${{ github.ref }}
@@ -54,8 +54,22 @@ jobs:
           ls -l build/shot-*.png
 
       - name: Upload screenshots
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: ui-screenshots
           path: build/shot-*.png
           retention-days: 7
+
+      - name: Publish screenshots to release
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view ui-shots >/dev/null 2>&1 || \
+            gh release create ui-shots --title "UI screenshots" --notes "交付前的模拟器截图。" --latest=false
+          for f in build/shot-*.png; do
+            [ -f "$f" ] && gh release upload ui-shots "$f" --clobber
+          done
+          echo "published"
