@@ -1,9 +1,10 @@
 import Foundation
 
-/// 勋章馆 / 排行榜 / 勋章详情的内存缓存层：5 分钟 TTL + in-flight 去重。
+/// 勋章馆 / 排行榜 / 勋章详情 / 皮肤序列的内存缓存层：5 分钟 TTL + in-flight 去重。
 final class MedalRepository: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
+    private let extra = QqMedalExtra()
 
     private var pageCache: [String: (expire: Date, page: MedalHallPage)] = [:]
     private var pageInflight: [String: Task<MedalHallPage, Error>] = [:]
@@ -46,6 +47,55 @@ final class MedalRepository: @unchecked Sendable {
         }
     }
 
+    /// 并行补齐所有未加载 Tab，每完成一个就回调，页面边拉边渲染。
+    func ensureHallTabs(_ page: MedalHallPage, onUpdate: @escaping (MedalHallPage) -> Void) async {
+        let pending = page.results.indices.filter { page.results[$0].loading && !page.results[$0].success }
+        guard !pending.isEmpty else { return }
+        let encUin = page.encUin
+
+        await withTaskGroup(of: (Int, ModuleTabResult).self) { group in
+            for index in pending {
+                let tab = page.results[index].tab
+                group.addTask { [api, encUin] in
+                    (index, await api.fetchHallTab(encUin: encUin, tab: tab))
+                }
+            }
+            for await (index, fresh) in group {
+                guard page.results.indices.contains(index) else { continue }
+                page.results[index] = fresh
+                onUpdate(page)
+            }
+        }
+    }
+
+    /// 拉取单个 Tab 并写回页面缓存。
+    func hallTab(_ page: MedalHallPage, index: Int) async -> ModuleTabResult {
+        guard page.results.indices.contains(index) else {
+            return ModuleTabResult(tab: MedalTab(name: "", type: 0, id: 0))
+        }
+        let fresh = await api.fetchHallTab(encUin: page.encUin, tab: page.results[index].tab)
+        page.results[index] = fresh
+        return fresh
+    }
+
+    // MARK: - 模块分页
+
+    func modulePage(
+        url: String,
+        moduleId: String,
+        moduleName: String,
+        lastPos: String = "",
+        pageSize: Int = 21
+    ) async throws -> HallModulePage {
+        let data = try await extra.fetchModule(url: url, moduleId: moduleId, lastPos: lastPos, pageSize: pageSize)
+        let items = QqMedalExtra.parseItems(data)
+        return HallModulePage(
+            module: MedalModule(moduleId: moduleId, moduleName: moduleName, items: items),
+            hasNext: (data["HasNext"] as? Bool) ?? false,
+            lastPos: QqApi.str(data["LastPos"])
+        )
+    }
+
     // MARK: - 排行榜
 
     func rankPage(_ url: String, force: Bool = false) async throws -> RankPageData {
@@ -70,7 +120,6 @@ final class MedalRepository: @unchecked Sendable {
         }
     }
 
-    /// 懒加载单个榜 Tab。
     func rankTab(_ url: String, tab: MedalTab) async throws -> RankDetail {
         try await api.fetchRankTab(url: url, tab: tab)
     }
@@ -111,5 +160,62 @@ final class MedalRepository: @unchecked Sendable {
     func fan(url: String, medalId: String, encUin: String) async throws -> FanMedal? {
         let detail = try await self.detail(url, medalId: medalId, encUin: encUin)
         return detail.fan
+    }
+
+    func cachedSkins(_ medalId: String) -> [SkinItem] {
+        store.skinCache(medalId)
+    }
+
+    func cachedSkins(_ medalId: String, uin: String) -> [SkinItem] {
+        store.skinCache(medalId)
+    }
+
+    /// 渐进扫描：每扫完一批就回调最新列表，UI 无需等待全量。
+    /// 20 个 seq 一批（外层 100 一档），连续 100 个空位就停止，最多扫到 2000。
+    func scanSkins(
+        medalId: String,
+        uin: String,
+        chunkSize: Int = 100,
+        isActive: @escaping () -> Bool,
+        onUpdate: @escaping ([SkinItem]) -> Void
+    ) async {
+        var currentSeq = 1
+        var emptyStreak = 0
+        var map: [Int: SkinItem] = [:]
+
+        for skin in store.skinCache(medalId) {
+            map[skin.seq] = skin
+        }
+        if !map.isEmpty { onUpdate(sortedSkins(map)) }
+
+        let total = (try? await skinTotal(medalId: medalId, encUin: uin))?.total
+
+        while isActive() {
+            if emptyStreak >= 100 || currentSeq > 2000 { break }
+            if let total, total > 0, map.count >= total { break }
+
+            let seqs = (0..<chunkSize).map { currentSeq + $0 }
+            let result = await extra.fetchSkinSeqs(uin: uin, seqs: seqs, medalId: medalId)
+            var hasSkin = false
+            for skin in result {
+                map[skin.seq] = skin
+                if !skin.pic.isEmpty { hasSkin = true }
+            }
+            emptyStreak = hasSkin ? 0 : emptyStreak + chunkSize
+            currentSeq += chunkSize
+
+            let skins = sortedSkins(map)
+            if !skins.isEmpty {
+                onUpdate(skins)
+                store.saveSkinCache(medalId, skins: skins)
+            }
+        }
+        store.saveSkinCache(medalId, skins: sortedSkins(map))
+    }
+
+    private func sortedSkins(_ map: [Int: SkinItem]) -> [SkinItem] {
+        map.values
+            .filter { !$0.pic.isEmpty }
+            .sorted { $0.seq < $1.seq }
     }
 }

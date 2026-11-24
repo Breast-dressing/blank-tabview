@@ -18,6 +18,7 @@ final class AppStore: @unchecked Sendable {
         static let familyArtist = "family_artist_name"
         static let familyArtistPrefix = "family_artist_"
         static let medalDataPrefix = "medal_data_"
+        static let medalSkinsPrefix = "medal_skins_"
     }
 
     private let defaults: UserDefaults
@@ -148,5 +149,18 @@ final class AppStore: @unchecked Sendable {
     func saveMedalData(_ medalId: String, data: [String: Any]) {
         guard let raw = try? JSONSerialization.data(withJSONObject: data) else { return }
         defaults.set(raw, forKey: Key.medalDataPrefix + medalId)
+    }
+
+    // MARK: - 皮肤缓存
+
+    func skinCache(_ medalId: String) -> [SkinItem] {
+        guard let data = defaults.data(forKey: Key.medalSkinsPrefix + medalId),
+              let list = try? JSONDecoder().decode([SkinItem].self, from: data) else { return [] }
+        return list.filter { !$0.pic.isEmpty }.sorted { $0.seq < $1.seq }
+    }
+
+    func saveSkinCache(_ medalId: String, skins: [SkinItem]) {
+        guard let data = try? JSONEncoder().encode(skins) else { return }
+        defaults.set(data, forKey: Key.medalSkinsPrefix + medalId)
     }
 }

@@ -33,6 +33,17 @@ final class MemberMetricsService: @unchecked Sendable {
         medals.invalidate()
     }
 
+    /// 已算好的指标快照（详情页里只读，不触发网络）。
+    func peek(_ itemId: String) -> MemberMetrics? {
+        cache[itemId]
+    }
+
+    /// 本地缓存里的成员资料（勋章接口失败时仍能展示头像与名字）。
+    func cachedMember(_ itemId: String) -> Member? {
+        store.memberInfo(itemId)
+            ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member
+    }
+
     func load(_ itemId: String, force: Bool = false) async throws -> MemberMetrics {
         if !force, let cached = cache[itemId] { return cached }
         let metrics = try await AsyncTimeout.run(seconds: 45) { [self] in
