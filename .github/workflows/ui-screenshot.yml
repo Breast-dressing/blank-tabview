@@ -44,21 +44,29 @@ jobs:
           xcrun simctl boot "iPhone 18 Pro" || true
           xcrun simctl bootstatus "iPhone 18 Pro" -b
           xcrun simctl install booted "$APP"
+          xcrun simctl io booted screenshot build/shot-before.png || true
           for tab in home profile search; do
             xcrun simctl terminate booted com.breastdressing.blanktabview || true
-            xcrun simctl launch booted com.breastdressing.blanktabview -startTab "$tab"
-            sleep 3
+            xcrun simctl launch booted com.breastdressing.blanktabview -startTab "$tab" 2>&1 | tee "build/launch-$tab.txt"
+            sleep 6
             xcrun simctl io booted screenshot "build/shot-$tab.png"
             echo "shot $tab done"
           done
-          ls -l build/shot-*.png
+          echo "== crash reports =="
+          ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true
+          for f in ~/Library/Logs/DiagnosticReports/*BlankTabView*; do
+            [ -f "$f" ] && { echo "--- $f"; head -80 "$f"; }
+          done || true
+          ls -l build/shot-*.png build/launch-*.txt
 
       - name: Upload screenshots
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: ui-screenshots
-          path: build/shot-*.png
+          path: |
+            build/shot-*.png
+            build/launch-*.txt
           retention-days: 7
 
       - name: Publish screenshots to release
@@ -69,7 +77,7 @@ jobs:
           set -euo pipefail
           gh release view ui-shots >/dev/null 2>&1 || \
             gh release create ui-shots --title "UI screenshots" --notes "交付前的模拟器截图。" --latest=false
-          for f in build/shot-*.png; do
+          for f in build/shot-*.png build/launch-*.txt; do
             [ -f "$f" ] && gh release upload ui-shots "$f" --clobber
           done
           echo "published"
