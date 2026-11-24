@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 系列详情：顶部成员信息（头像 / 名字 / 「艺人名字的系列名」/ 右侧该系列已获得），下面三列皮肤。
 struct SkinSeriesView: View {
@@ -21,7 +22,7 @@ struct SkinSeriesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 头部放在 List 外面，边距与卡片容器一致（20），不会被卡片圆角裁剪。
+            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
             MemberSectionHeader(
                 title: member.title,
                 pic: member.pic,
@@ -49,7 +50,9 @@ struct SkinSeriesView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(.compact)
+            .scrollContentBackground(.hidden)
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(seriesName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedSkin) { skin in

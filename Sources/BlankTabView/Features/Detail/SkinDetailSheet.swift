@@ -3,17 +3,21 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（内容不滚动、高度跟着内容走、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、禁用液态玻璃、隐藏抓手）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
     let uin: String
     var zoomNamespace: Namespace.ID? = nil
 
+    /// 固定高度：工具栏 44 + 图片 280 + 间距 8 + 两行文本 42 + 底部边距 20。
+    private static let baseHeight: CGFloat = 44 + 280 + 8 + 42 + 20
+    /// 图片按真实宽高比算出来的显示高度（最大 280）。
+    @State private var imageHeight: CGFloat = 280
+    @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
+
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
-    /// 图片按真实宽高比算出来的显示高度（最大 280），弹窗高度直接跟着它走。
-    @State private var imageHeight: CGFloat = 280
 
     private var link: String {
         let safeId = skin.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? skin.id
@@ -32,7 +36,6 @@ struct SkinDetailSheet: View {
                 imageView
 
                 VStack(alignment: .leading, spacing: 4) {
-                    // 原来是皮肤名字的位置，换成限定编号，字号字重不变。
                     Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
                         .font(.system(size: 19, weight: .bold))
 
@@ -67,10 +70,9 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 高度完全由内容决定：工具栏 + 图片真实高度 + 8 + 文本 + 20，底部不再多留白。
-        .presentationSizing(.fitted)
+        // 固定 394，图片比 280 矮时把差值减掉，底部不出现多出来的空白。
+        .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
-        // 关掉 sheet 的液态玻璃背景，改成不透明系统分组灰。
         .presentationBackground(Color(uiColor: .systemGroupedBackground))
         .presentationCornerRadius(36)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
@@ -96,7 +98,9 @@ struct SkinDetailSheet: View {
             if let image {
                 let maxWidth = UIScreen.main.bounds.width - 40
                 let ratio = image.size.height / max(1, image.size.width)
-                imageHeight = min(280, maxWidth * ratio)
+                let height = min(280, maxWidth * ratio)
+                imageHeight = height
+                sheetHeight = SkinDetailSheet.baseHeight - (280 - height)
             }
         }
     }

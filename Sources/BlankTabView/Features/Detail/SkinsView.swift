@@ -46,7 +46,6 @@ final class SkinsModel: ObservableObject {
 
     var displayTotal: Int { total > 0 ? total : skins.count }
 
-    /// 头部副标题：「艺人名字」+「的乐迷皮肤」。
     var headerSubtitle: String {
         let artist = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !artist.isEmpty { return "\(artist)的乐迷皮肤" }
@@ -62,7 +61,6 @@ final class SkinsModel: ObservableObject {
         scanning = true
         error = nil
 
-        // 与成员卡片同一口径：优先用接口返回的皮肤总数。
         if let list = try? await services.medals.skinTotal(medalId: medalId, encUin: memberId) {
             total = list.total > 0 ? list.total : list.skins.count
         }
@@ -132,7 +130,7 @@ struct SkinsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 头部放在 List 外面，用与卡片容器相同的左右边距（20），不会被卡片圆角裁剪。
+            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
             MemberSectionHeader(
                 title: model.member.title,
                 pic: model.member.pic,
@@ -154,7 +152,6 @@ struct SkinsView: View {
                                 Text(group.name)
                                     .font(.system(size: 16, weight: .semibold))
                                 Spacer(minLength: 8)
-                                // 「已收集 x/y」和箭头在一个按钮里，只有这块可点。
                                 Button {
                                     pendingSeries = route(for: group)
                                 } label: {
@@ -188,7 +185,9 @@ struct SkinsView: View {
             }
             .listStyle(.insetGrouped)
             .listSectionSpacing(.compact)
+            .scrollContentBackground(.hidden)
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
