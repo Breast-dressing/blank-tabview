@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// 统一页面骨架：左上角大标题（自绘头部，34pt 粗体，纯文字不用按钮），
-/// 与右侧动作（如设置齿轮）同一行；内容紧贴标题下方。
+/// 统一页面骨架：标题走系统导航栏标题位（左上角大标题），右侧动作走工具栏尾部。
 struct PageScaffold<Content: View, Trailing: View>: View {
     let title: String
     let background: Color
@@ -24,8 +23,7 @@ struct PageScaffold<Content: View, Trailing: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        Group {
             if scroll {
                 ScrollView {
                     stack
@@ -35,24 +33,15 @@ struct PageScaffold<Content: View, Trailing: View>: View {
                 stack
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(background.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(title)
-                .font(.system(size: 34, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8)
-            trailing
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                trailing
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
-        .padding(.bottom, 10)
     }
 
     private var stack: some View {
@@ -63,7 +52,7 @@ struct PageScaffold<Content: View, Trailing: View>: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 2)
+        .padding(.top, 0)
         .padding(.bottom, scroll ? 24 : 0)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(maxHeight: scroll ? nil : .infinity, alignment: .topLeading)

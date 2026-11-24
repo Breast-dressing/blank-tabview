@@ -143,7 +143,5 @@ struct DetailScroll<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
-        // 根页自绘大标题时隐藏了导航栏，子页面要恢复系统导航栏（含默认返回按钮）
-        .toolbar(.visible, for: .navigationBar)
     }
 }
