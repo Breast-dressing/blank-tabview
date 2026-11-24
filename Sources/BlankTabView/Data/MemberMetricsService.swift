@@ -8,6 +8,7 @@ struct RankSummary: Sendable {
 }
 
 /// 把一个成员的「周榜 / 月榜 / 乐迷皮肤 / 奖章 / 乐迷值 / 近 7 天荣誉」一次算清。
+/// 成员资料缺失时先去家族成员里补，不把“未知”展示给用户。
 final class MemberMetricsService: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
@@ -44,6 +45,30 @@ final class MemberMetricsService: @unchecked Sendable {
             ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member
     }
 
+    /// 成员资料补全（唯一入口）：缓存 → 内存成员 → 逐个家族拉取。
+    /// 「我的」页与成员详情都走这里，避免两边各写一份解析 / 回退。
+    func ensureMember(_ itemId: String) async -> Member? {
+        guard !itemId.isEmpty else { return nil }
+        if let cached = cachedMember(itemId), !cached.title.isEmpty {
+            return cached
+        }
+
+        let repo = families
+        let familyList = repo.families
+        for family in familyList {
+            let members = (try? await repo.loadMembers(family)) ?? []
+            if let hit = members.first(where: { $0.itemId == itemId }) {
+                store.saveMemberInfo(hit, familyId: family.id)
+                return hit
+            }
+        }
+        for entry in repo.allMembersCached() where entry.member.itemId == itemId {
+            store.saveMemberInfo(entry.member, familyId: entry.family.id)
+            return entry.member
+        }
+        return nil
+    }
+
     func load(_ itemId: String, force: Bool = false) async throws -> MemberMetrics {
         if !force, let cached = cache[itemId] { return cached }
         let metrics = try await AsyncTimeout.run(seconds: 45) { [self] in
@@ -56,6 +81,7 @@ final class MemberMetricsService: @unchecked Sendable {
     private func build(_ itemId: String) async throws -> MemberMetrics {
         let member = store.memberInfo(itemId)
             ?? families.allMembersCached().first(where: { $0.member.itemId == itemId })?.member
+            ?? await ensureMember(itemId)
             ?? Member(itemId: itemId, title: "未知")
 
         let family = families.familyOfMember(itemId, hintFamilyId: member.familyId)

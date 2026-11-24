@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// 「我的」页的状态机：选中成员 → 拉指标 → 荣誉分组；不依赖 UI。
+/// 「我的」页的状态机：选中成员 → 补全成员资料 → 拉指标 → 荣誉分组；不依赖 UI。
 @MainActor
 final class ProfileViewModel: ObservableObject {
     private let services = AppServices.shared
@@ -37,14 +37,19 @@ final class ProfileViewModel: ObservableObject {
         }
 
         loading = true
+        // 头像 / 名字 / 铭牌先靠家族成员补齐，避免第一屏就是“未知”
+        _ = await services.metrics.ensureMember(resolved)
+
         do {
             let result = try await services.metrics.load(resolved, force: force)
             metrics = result
             honorGroups = services.honors.groupsOf(result.member.title)
             error = nil
         } catch {
-            metrics = nil
-            honorGroups = []
+            // 接口挂了也要先显示成员资料，四个入口显示 “--”，错误单独提示
+            let fallback = services.member(resolved)
+            metrics = MemberMetrics(member: fallback, familyName: metrics?.familyName ?? "")
+            honorGroups = services.honors.groupsOf(fallback.title)
             self.error = error.localizedDescription
         }
         loading = false
@@ -60,15 +65,5 @@ final class ProfileViewModel: ObservableObject {
     }
 
     /// 近 7 天横坐标：11/18 … 11/24
-    var dayLabels: [String] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        var labels: [String] = []
-        for offset in stride(from: 6, through: 0, by: -1) {
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let parts = calendar.dateComponents([.month, .day], from: day)
-            labels.append("\(parts.month ?? 0)/\(parts.day ?? 0)")
-        }
-        return labels
-    }
+    var dayLabels: [String] { DayLabels.recent7 }
 }

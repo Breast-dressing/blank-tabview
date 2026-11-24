@@ -21,6 +21,7 @@ final class MemberDetailModel: ObservableObject {
     func load() async {
         loading = true
         error = nil
+        _ = await services.metrics.ensureMember(memberId)
         member = services.member(memberId)
         do {
             let result = try await services.metrics.load(memberId, force: true)
@@ -55,8 +56,10 @@ struct MemberDetailView: View {
 
             if model.loading {
                 StateNotice(title: "正在读取成员数据…", progress: true)
-            } else if let metrics = model.metrics {
-                summary(metrics)
+            }
+
+            if let metrics = model.metrics {
+                entryCard(metrics)
                 ProfileDetailSection(
                     metrics: metrics,
                     honorGroups: model.groups,
@@ -66,7 +69,7 @@ struct MemberDetailView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
-            } else {
+            } else if !model.loading {
                 if let error = model.error {
                     StateNotice(title: "成员数据加载失败", message: error, actionTitle: "重试") {
                         Task { await model.load() }
@@ -82,15 +85,50 @@ struct MemberDetailView: View {
         .task { await model.load() }
     }
 
-    private func summary(_ metrics: MemberMetrics) -> some View {
+    /// 与「我的」票据卡同一套入口规则，四个数据都可点进详情。
+    private func entryCard(_ metrics: MemberMetrics) -> some View {
         InfoCard {
-            HStack(spacing: 0) {
-                cell("周榜", metrics.displayWeekRank)
-                cell("月榜", metrics.displayMonthRank)
-                cell("皮肤", metrics.displaySkinCount)
-                cell("奖章", metrics.medalDesc)
+            HStack(alignment: .top, spacing: 0) {
+                entry("周榜", metrics.displayWeekRank, MemberEntries.rank(metrics, monthly: false))
+                entry("月榜", metrics.displayMonthRank, MemberEntries.rank(metrics, monthly: true))
+                entry("乐迷皮肤", metrics.displaySkinCount, MemberEntries.skins(metrics))
+                entry("已获得奖章", metrics.medalDesc, MemberEntries.medals(metrics))
             }
         }
+    }
+
+    @ViewBuilder
+    private func entry(_ label: String, _ value: String, _ destination: ProfileDestination?) -> some View {
+        if let destination {
+            NavigationLink(value: destination) {
+                entryCell(label, value, enabled: true)
+            }
+            .buttonStyle(.plain)
+        } else {
+            entryCell(label, value, enabled: false)
+        }
+    }
+
+    private func entryCell(_ label: String, _ value: String, enabled: Bool) -> some View {
+        VStack(spacing: 5) {
+            Text(value)
+                .font(.system(size: 18, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            HStack(spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if enabled {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+            }
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 
     private var summaryBase: some View {
