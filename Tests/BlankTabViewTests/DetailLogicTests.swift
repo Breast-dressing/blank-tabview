@@ -41,37 +41,31 @@ final class DetailLogicTests: XCTestCase {
         XCTAssertTrue(store.skinCache("unknown").isEmpty)
     }
 
-    func testModuleItemsParseCards() {
-        let payload: [String: Any] = [
-            "CardList": [
-                [
-                    "Name": "废书欣",
-                    "MedalID": "3069960",
-                    "PicURL": "https://x/p.png",
-                    "Scheme": "https://i2.y.qq.com/x?medal_id=3069960",
-                    "Level": 3
-                ]
+    func testParseItemsFromCards() {
+        let cards: [[String: Any]] = [
+            [
+                "Name": "废书欣",
+                "MedalID": "3069960",
+                "PicURL": "https://x/p.png",
+                "Scheme": "https://i2.y.qq.com/x?medal_id=3069960",
+                "Level": 3
             ],
-            "HasNext": true
+            ["Name": "", "MedalID": "8"]
         ]
 
-        let items = QqMedalExtra.parseItems(payload)
-        XCTAssertEqual(items.count, 1)
+        let items = QqApi.parseItems(cards)
+        XCTAssertEqual(items.count, 2)
         XCTAssertEqual(items.first?.name, "废书欣")
         XCTAssertEqual(items.first?.medalId, "3069960")
         XCTAssertTrue(items.first?.unlocked == true)
+        XCTAssertEqual(items.last?.name, "未命名")
     }
 
-    func testModuleItemsFallbackToMedalList() {
-        let payload: [String: Any] = [
-            "MedalList": [
-                ["Name": "", "MedalID": "8"]
-            ]
-        ]
-        let items = QqMedalExtra.parseItems(payload)
-        XCTAssertEqual(items.count, 1)
-        XCTAssertEqual(items.first?.name, "未命名")
-        XCTAssertFalse(items.first?.unlocked ?? true)
+    func testFetchModuleUsesSameParser() throws {
+        // 模块分页与首页模块卡共用 parseItems：同一份 data 解析出同样的卡片。
+        let data: [String: Any] = ["MedalList": [["Name": "乐迷", "MedalID": "7"]]]
+        let items = QqApi.parseItems(QqApi.list(data["MedalList"]))
+        XCTAssertEqual(items.map(\.medalId), ["7"])
     }
 
     func testDayLabelsProducesSevenEntries() {

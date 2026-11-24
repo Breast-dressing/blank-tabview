@@ -1,7 +1,8 @@
 import Foundation
 
 /// QQ 音乐勋章相关接口的封装：签名与 SSR 解析都在客户端完成。
-/// 只搬迁「我的」页所需的部分：家族成员、勋章馆、排行榜、勋章详情、皮肤总数。
+/// 家族成员、勋章馆（分类 + 模块分页）、排行榜、勋章详情、皮肤序列全部在这里解析，
+/// UI / 仓库层不再重复实现任何解析逻辑。
 final class QqApi: @unchecked Sendable {
     static let apiURL = "https://u6.y.qq.com/cgi-bin/musics.fcg"
     private static let skinBase = "https://i2.y.qq.com/n3/medal_collection/pages/medal_collection_v3"
@@ -75,6 +76,15 @@ final class QqApi: @unchecked Sendable {
     private func ssrOf(_ url: String) async throws -> [String: Any]? {
         let html = try await http.getText(url)
         return Self.extractSsr(html)
+    }
+
+    /// 从勋章馆 / 皮肤页的 SSR 里拿 enc_uin。
+    private func encUinOf(_ url: String) async -> String {
+        guard let ssr = try? await ssrOf(url) else { return "" }
+        let data = Self.map(ssr["data"])
+        let fromData = Self.str(data["EncUin"])
+        if !fromData.isEmpty { return fromData }
+        return Self.str(Self.map(ssr["query"])["enc_uin"])
     }
 
     // MARK: - 家族成员
@@ -244,33 +254,74 @@ final class QqApi: @unchecked Sendable {
         }
     }
 
+    /// 勋章卡解析：首页模块卡与模块分页共用这一套。
+    static func parseItems(_ source: [[String: Any]]) -> [MedalItem] {
+        source.map { item -> MedalItem in
+            let name = str(item["Name"])
+            return MedalItem(
+                medalId: str(item["MedalID"]),
+                name: name.isEmpty ? "未命名" : name,
+                picUrl: str(item["PicURL"]),
+                scheme: str(item["Scheme"]),
+                level: int(item["Level"]),
+                state: int(item["State"]),
+                numberText: str(map(item["NumberInfo"])["Content"]),
+                createTime: str(item["CreateTime"]),
+                cornerTitle: str(map(item["Corner"])["Title"])
+            )
+        }
+    }
+
     private func parseModules(_ raw: Any?) -> [MedalModule] {
         Self.list(raw).map { module -> MedalModule in
             let cards = Self.list(module["CardList"])
             let medals = Self.list(module["MedalList"])
-            let source = cards.isEmpty ? medals : cards
-            let items = source.map { item -> MedalItem in
-                let name = Self.str(item["Name"])
-                return MedalItem(
-                    medalId: Self.str(item["MedalID"]),
-                    name: name.isEmpty ? "未命名" : name,
-                    picUrl: Self.str(item["PicURL"]),
-                    scheme: Self.str(item["Scheme"]),
-                    level: Self.int(item["Level"]),
-                    state: Self.int(item["State"]),
-                    numberText: Self.str(Self.map(item["NumberInfo"])["Content"]),
-                    createTime: Self.str(item["CreateTime"]),
-                    cornerTitle: Self.str(Self.map(item["Corner"])["Title"])
-                )
-            }
             let moduleId = Self.str(module["ModuleID"])
             let moduleName = Self.str(module["ModuleName"])
             return MedalModule(
                 moduleId: moduleId,
                 moduleName: moduleName.isEmpty ? "模块 \(moduleId)" : moduleName,
-                items: items
+                items: Self.parseItems(cards.isEmpty ? medals : cards)
             )
         }
+    }
+
+    // MARK: - 模块分页（「全部」页面）
+
+    /// `GetModuleDetail`：接管模块分页的解析，和首页模块卡共用 `parseItems`。
+    func fetchModule(
+        url: String,
+        moduleId: String,
+        lastPos: String = "",
+        pageSize: Int = 21
+    ) async throws -> HallModulePage {
+        let encUin = await encUinOf(url)
+        let numberId = Int(moduleId.filter { $0.isNumber }) ?? 0
+        let req = try await cgi(
+            "GetModuleDetail",
+            [
+                "ModuleID": numberId,
+                "EncUin": encUin,
+                "PageSize": pageSize,
+                "LastPos": lastPos,
+                "SupportCardStyle": true
+            ],
+            "music.medalHall.MedalHallHomepageSrv",
+            "GetModuleDetail"
+        )
+        let code = Self.int(req["code"])
+        if code != 0 {
+            let message = Self.str(req["msg"])
+            throw ApiError(message.isEmpty ? "模块加载失败（code=\(code)）" : message, code: code)
+        }
+        let data = Self.map(req["data"])
+        let cards = Self.list(data["CardList"])
+        let medals = Self.list(data["MedalList"])
+        return HallModulePage(
+            module: MedalModule(moduleId: moduleId, moduleName: "", items: Self.parseItems(cards.isEmpty ? medals : cards)),
+            hasNext: (data["HasNext"] as? Bool) ?? false,
+            lastPos: Self.str(data["LastPos"])
+        )
     }
 
     // MARK: - 排行榜
@@ -597,6 +648,84 @@ final class QqApi: @unchecked Sendable {
         let list = try await fetchSkinShowList(medalId: medalId, encUin: encUin)
         skinCache[key] = (Date().addingTimeInterval(300), list)
         return list
+    }
+
+    /// 按 seq 批量抓皮肤详情页：每批最多 20 并发，解析与详情页共用 `fetchSingleSkin`。
+    func fetchSkinSeqs(uin: String, seqs: [Int], medalId: String) async -> [SkinItem] {
+        guard !seqs.isEmpty else { return [] }
+        var items: [SkinItem] = []
+        var index = 0
+        while index < seqs.count {
+            let end = Swift.min(index + 20, seqs.count)
+            let chunk = Array(seqs[index..<end])
+            index = end
+            await withTaskGroup(of: SkinItem?.self) { group in
+                for seq in chunk {
+                    group.addTask { [self] in
+                        await fetchSingleSkin(medalId: medalId, seq: seq, uin: uin)
+                    }
+                }
+                for await result in group {
+                    if let result { items.append(result) }
+                }
+            }
+        }
+        return items
+    }
+
+    /// `skin_detail.html` 的 SSR → SkinItem；无图时返回 nil（不写入缓存）。
+    func fetchSingleSkin(medalId: String, seq: Int, uin: String, retries: Int = 1) async -> SkinItem? {
+        let targetId = "\(medalId)-\(seq)"
+        let decoded = uin.removingPercentEncoding ?? uin
+        let safeUin = decoded.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? decoded
+        let url = "\(Self.skinBase)/skin_detail.html?_hidehd=1&_fontscale=1&skin_id=\(targetId)&enc_uin=\(safeUin)"
+
+        do {
+            let html = try await http.getText(url, timeout: 15)
+            guard let ssr = Self.extractSsr(html), Self.int(ssr["code"]) == 0 else { return nil }
+            let data = Self.map(ssr["data"])
+            let info = Self.map(data["SkinInfo"])
+            guard !info.isEmpty else { return nil }
+
+            let levels = Self.list(info["LevelList"])
+            let level = levels.first ?? [:]
+            let pic = Self.str(level["Pic"])
+            guard !pic.isEmpty else { return nil }
+
+            let unlockedTs = Self.int(info["UnlockedTs"])
+            let unlocked = Self.int(level["State"]) == 2 || unlockedTs > 0
+            let tasks = Self.list(Self.map(level["LevelUnlockGuide"])["TaskList"])
+            let unlockTask = tasks.isEmpty ? "" : Self.str(tasks[0]["Title"])
+            let name = Self.str(info["Name"])
+
+            return SkinItem(
+                id: Self.str(info["ID"]).isEmpty ? targetId : Self.str(info["ID"]),
+                seq: seq,
+                name: name.isEmpty ? "(未命名)" : name,
+                pic: pic,
+                categId: Self.str(info["CategID"]),
+                seqNo: Self.str(level["SeqNo"]),
+                unlockedDate: unlockedTs > 0 ? Self.skinDate(unlockedTs) : "",
+                userCount: Self.int(info["UnlockedUserCnt"]),
+                isUnlocked: unlocked,
+                stateText: unlocked ? "已解锁" : "未解锁",
+                unlockTask: unlockTask,
+                bgColor: Self.str(level["BGColor"]).isEmpty ? "#FAFAFA" : Self.str(level["BGColor"])
+            )
+        } catch {
+            if retries > 0 {
+                return await fetchSingleSkin(medalId: medalId, seq: seq, uin: uin, retries: retries - 1)
+            }
+            return nil
+        }
+    }
+
+    private static func skinDate(_ timestamp: Int) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     // MARK: - 其他

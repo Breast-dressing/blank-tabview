@@ -1,10 +1,10 @@
 import Foundation
 
 /// 勋章馆 / 排行榜 / 勋章详情 / 皮肤序列的内存缓存层：5 分钟 TTL + in-flight 去重。
+/// 解析全部交给 `QqApi`，这里只做缓存、并发编排与落盘。
 final class MedalRepository: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
-    private let extra = QqMedalExtra()
 
     private var pageCache: [String: (expire: Date, page: MedalHallPage)] = [:]
     private var pageInflight: [String: Task<MedalHallPage, Error>] = [:]
@@ -87,13 +87,15 @@ final class MedalRepository: @unchecked Sendable {
         lastPos: String = "",
         pageSize: Int = 21
     ) async throws -> HallModulePage {
-        let data = try await extra.fetchModule(url: url, moduleId: moduleId, lastPos: lastPos, pageSize: pageSize)
-        let items = QqMedalExtra.parseItems(data)
-        return HallModulePage(
-            module: MedalModule(moduleId: moduleId, moduleName: moduleName, items: items),
-            hasNext: (data["HasNext"] as? Bool) ?? false,
-            lastPos: QqApi.str(data["LastPos"])
+        let page = try await api.fetchModule(
+            url: url,
+            moduleId: moduleId,
+            lastPos: lastPos,
+            pageSize: pageSize
         )
+        var module = page.module
+        module.moduleName = moduleName.isEmpty ? "模块 \(moduleId)" : moduleName
+        return HallModulePage(module: module, hasNext: page.hasNext, lastPos: page.lastPos)
     }
 
     // MARK: - 排行榜
@@ -179,7 +181,7 @@ final class MedalRepository: @unchecked Sendable {
             if let total, total > 0, map.count >= total { break }
 
             let seqs = (0..<chunkSize).map { currentSeq + $0 }
-            let result = await extra.fetchSkinSeqs(uin: uin, seqs: seqs, medalId: medalId)
+            let result = await api.fetchSkinSeqs(uin: uin, seqs: seqs, medalId: medalId)
             var hasSkin = false
             for skin in result {
                 map[skin.seq] = skin
