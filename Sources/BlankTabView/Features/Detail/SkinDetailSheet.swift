@@ -70,11 +70,8 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 369，不改圆角与高度，只把背景材质换成普通材质以禁用 Liquid Glass。
-        .presentationDetents([.height(sheetHeight)])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(.regularMaterial)
-        .presentationCornerRadius(36)
+        // 固定 369 高；材质与圆角都画在内容上，zoom 动画全过程不会露出直角。
+        .detailSheetChrome(height: sheetHeight)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
 

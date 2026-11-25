@@ -89,10 +89,8 @@ struct ProfilePage: View {
                 onTapMedals: tap(MemberEntries.medals(metrics)),
                 onTapFamily: { path.append(MemberEntries.family($0)) }
             )
-        } else if model.loading {
-            ProfileStateCard(title: "正在读取成员数据…", showsProgress: true)
         } else {
-            // 没有成员时用的是同一张票据卡，只是喂占位数据，不再另写一套空状态 UI。
+            // 加载中 / 没有成员：一律用同一张票据卡的占位样式，不再出现长条 loading。
             ProfileTicketCard(
                 metrics: Self.placeholderMetrics,
                 families: [],
