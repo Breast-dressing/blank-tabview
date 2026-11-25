@@ -219,7 +219,7 @@ struct SkinsView: View {
             count: "\(model.displayTotal)",
             unit: "款"
         )
-        .memberInfoRow(inset: 16)
+        .memberInfoRow()
     }
 
     /// 系列标题行：系列名 + 已收集 x/y 箭头。
@@ -347,7 +347,7 @@ struct SkinTileGrid: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(Color.clear)
                 )
-                .matchedTransitionSourceIfAvailable(id: skin.id, in: zoomNamespace)
+                .matchedTransitionSourceIfAvailable(id: skin.id, in: zoomNS)
             }
         }
     }
