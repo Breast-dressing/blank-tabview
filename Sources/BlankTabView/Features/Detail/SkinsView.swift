@@ -130,7 +130,7 @@ struct SkinsView: View {
 
     var body: some View {
         List {
-            // 成员信息就是列表第一行，平铺滚动，不包卡片。
+            // 成员信息是列表第一行。内容自身留出边距，避开卡片圆角，不会被裁剪。
             Section {
                 MemberSectionHeader(
                     title: model.member.title,
@@ -139,9 +139,14 @@ struct SkinsView: View {
                     count: "\(model.displayTotal)",
                     unit: "款"
                 )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
+            // 与下方第一个系列卡片零间距：卡片直接贴着成员信息。
+            .listSectionSpacing(.custom(0))
 
             if model.groups.isEmpty {
                 stateRow

@@ -55,6 +55,11 @@ jobs:
           sleep 6
           xcrun simctl io booted screenshot "build/shot-sheet.png"
           echo "shot sheet done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkins 2>&1 | tee build/launch-skins.txt
+          sleep 6
+          xcrun simctl io booted screenshot "build/shot-skins.png"
+          echo "shot skins done"
 
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true

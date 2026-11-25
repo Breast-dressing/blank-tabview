@@ -1,9 +1,7 @@
 import SwiftUI
 import UIKit
 
-extension SkinItem: Identifiable {}
-
-/// 单个皮肤详情：原生 sheet（固定 374 高度、默认液态玻璃背景、隐藏抓手、内容不滚动）。
+/// 单个皮肤详情：原生 sheet（固定 369 高度、默认液态玻璃背景、隐藏抓手、内容不滚动）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -14,8 +12,8 @@ struct SkinDetailSheet: View {
 
     @State private var imageHeight: CGFloat = 280
 
-    /// 固定高度 374：工具栏 + 图片 280 + 间距 8 + 两行文本，图片按比例变矮时扣掉差值。
-    private static let baseHeight: CGFloat = 374
+    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 两行文本，图片按比例变矮时扣掉差值。
+    private static let baseHeight: CGFloat = 369
     @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
     @Environment(\.dismiss) private var dismiss
@@ -70,7 +68,7 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 374，背景仍由系统液态玻璃提供，不自己铺底色。
+        // 固定 369，背景仍由系统液态玻璃提供，不自己铺底色。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(36)

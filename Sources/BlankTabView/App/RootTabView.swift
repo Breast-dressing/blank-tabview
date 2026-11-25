@@ -18,6 +18,12 @@ struct RootTabView: View {
                 Label(AppTab.search.title, systemImage: AppTab.search.systemImage)
             }
         }
+        // 仅用于 CI 截图核对：-demoSkins 时直接展示乐迷皮肤页（成员信息平铺效果）。
+        .fullScreenCover(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoSkins"))) {
+            NavigationStack {
+                SkinsView(memberId: "", medalId: "", medalName: "乐迷皮肤", scheme: "")
+            }
+        }
         // 仅用于 CI 截图核对：-demoSkin 时直接弹出皮肤弹窗。
         .sheet(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoSkin"))) {
             SkinDetailSheet(
