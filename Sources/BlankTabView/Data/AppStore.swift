@@ -187,15 +187,21 @@ final class AppStore: @unchecked Sendable {
 
     // MARK: - 皮肤缓存
 
-    func skinCache(_ medalId: String) -> [SkinItem] {
-        guard let data = defaults.data(forKey: Key.medalSkinsPrefix + medalId),
+    /// 皮肤缓存按「勋章 + 成员」分开存，避免不同成员的同名勋章互相串数据。
+    private func skinKey(_ medalId: String, _ memberId: String) -> String {
+        let canonical = MemberId.canonical(memberId)
+        return canonical.isEmpty ? medalId : "\(medalId)_\(canonical)"
+    }
+
+    func skinCache(_ medalId: String, memberId: String = "") -> [SkinItem] {
+        guard let data = defaults.data(forKey: Key.medalSkinsPrefix + skinKey(medalId, memberId)),
               let list = try? JSONDecoder().decode([SkinItem].self, from: data) else { return [] }
         return list.filter { !$0.pic.isEmpty }.sorted { $0.seq < $1.seq }
     }
 
-    func saveSkinCache(_ medalId: String, skins: [SkinItem]) {
+    func saveSkinCache(_ medalId: String, memberId: String, skins: [SkinItem]) {
         guard let data = try? JSONEncoder().encode(skins) else { return }
-        defaults.set(data, forKey: Key.medalSkinsPrefix + medalId)
+        defaults.set(data, forKey: Key.medalSkinsPrefix + skinKey(medalId, memberId))
     }
 
     // MARK: - 皮肤空序号（按勋章名字共享）

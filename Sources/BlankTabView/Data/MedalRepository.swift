@@ -128,7 +128,8 @@ final class MedalRepository: @unchecked Sendable {
     // MARK: - 勋章详情
 
     func detail(_ url: String, medalId: String, force: Bool = false, encUin: String = "") async throws -> MedalDetail {
-        let key = medalId.isEmpty ? url : medalId
+        // 详情按「链接 + 勋章 + 成员」缓存，否则不同成员的同名勋章会拿到展示成员的缓存。
+        let key = "\(url)#\(medalId)#\(encUin)"
         if !force, let cached = detailCache[key] { return cached }
 
         do {
@@ -152,14 +153,14 @@ final class MedalRepository: @unchecked Sendable {
         return detail.fan
     }
 
-    func cachedSkins(_ medalId: String) -> [SkinItem] {
-        store.skinCache(medalId)
+    func cachedSkins(_ medalId: String, memberId: String) -> [SkinItem] {
+        store.skinCache(medalId, memberId: memberId)
     }
 
     /// 渐进扫描：从 1 开始逐个序号解析，连续 50 个序号没有皮肤就停止，最多扫到 2000。
     ///
     /// - 展示成员（拥有该勋章）：空序号按勋章名字记录，供同名字的勋章复用；再次进入时从最后一个
-    ///   有皮肤的序号往前数（含自身）第 40 个序号起，把这段重扫一遍做校验，再继续往后扫。
+    ///   有皮肤的序号往前数（含自身）第 40 个序号起重扫一遍做校验，再继续往后扫。
     /// - 其他成员：跳过同名字勋章已记录的空序号，不写记录，下次仍从 1 开始。
     func scanSkins(
         medalId: String,
@@ -171,7 +172,7 @@ final class MedalRepository: @unchecked Sendable {
         onUpdate: @escaping ([SkinItem]) -> Void
     ) async {
         var map: [Int: SkinItem] = [:]
-        for skin in store.skinCache(medalId) {
+        for skin in store.skinCache(medalId, memberId: uin) {
             map[skin.seq] = skin
         }
         if !map.isEmpty { onUpdate(sortedSkins(map)) }
@@ -184,7 +185,6 @@ final class MedalRepository: @unchecked Sendable {
         // 校验窗口的左边界：本人已有缓存时，这段序号会重新解析一遍做校验。
         var verifyFrom = Int.max
         if isOwner, let last = map.keys.max() {
-            // 从最后一个有皮肤的序号往前数（含自身）第 40 个序号重新开始。
             currentSeq = Swift.max(1, last - 39)
             verifyFrom = currentSeq
         }
@@ -196,9 +196,7 @@ final class MedalRepository: @unchecked Sendable {
         while isActive() {
             if currentSeq > 2000 { break }
             if emptyStreak >= 50 {
-                // 连续 50 个空：再复核一遍这 50 个序号。
-                // 解析失败（超时 / 限流）与「确实没有皮肤」在底层都返回空，node 版也只认成功响应里的
-                // SkinInfo，所以必须复核一次，避免一波网络抖动被误判成扫描结束。
+                // 连续 50 个空：再复核一遍这 50 个序号（失败与真没皮肤在底层都返回空）。
                 confirms += 1
                 let tail = Array(Swift.max(1, currentSeq - 50)..<currentSeq)
                 let probe = await api.fetchSkinSeqs(uin: uin, seqs: tail, medalId: medalId)
@@ -214,7 +212,7 @@ final class MedalRepository: @unchecked Sendable {
                 emptyStreak = 0
                 let skins = sortedSkins(map)
                 onUpdate(skins)
-                store.saveSkinCache(medalId, skins: skins)
+                store.saveSkinCache(medalId, memberId: uin, skins: skins)
                 if isOwner { store.saveSkinEmptySeqs(medalName, seqs: emptySeqs.sorted()) }
                 continue
             }
@@ -247,12 +245,12 @@ final class MedalRepository: @unchecked Sendable {
 
             let skins = sortedSkins(map)
             if !skins.isEmpty { onUpdate(skins) }
-            store.saveSkinCache(medalId, skins: skins)
+            store.saveSkinCache(medalId, memberId: uin, skins: skins)
             if isOwner { store.saveSkinEmptySeqs(medalName, seqs: emptySeqs.sorted()) }
         }
 
         let skins = sortedSkins(map)
-        store.saveSkinCache(medalId, skins: skins)
+        store.saveSkinCache(medalId, memberId: uin, skins: skins)
         if isOwner { store.saveSkinEmptySeqs(medalName, seqs: emptySeqs.sorted()) }
         if !skins.isEmpty { onUpdate(skins) }
     }
