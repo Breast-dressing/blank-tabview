@@ -92,14 +92,22 @@ struct ProfilePage: View {
         } else if model.loading {
             ProfileStateCard(title: "正在读取成员数据…", showsProgress: true)
         } else {
-            ProfileStateCard(
-                title: "还没有当前成员",
-                message: "添加家族并选择自己的成员身份后，这里会显示周榜、月榜、乐迷皮肤与奖章。",
-                actionTitle: "添加家族",
-                action: { showSettings = true }
+            // 没有成员时用的是同一张票据卡，只是喂占位数据，不再另写一套空状态 UI。
+            ProfileTicketCard(
+                metrics: Self.placeholderMetrics,
+                families: [],
+                weekHonor: { _ in 0 }
             )
         }
     }
+
+    /// 未添加成员时的占位数据。
+    static let placeholderMetrics: MemberMetrics = {
+        var member = Member()
+        member.title = "未添加成员"
+        member.fanBadge = "添加家族并选择成员身份后，这里会显示周榜、月榜、乐迷皮肤与奖章。"
+        return MemberMetrics(member: member)
+    }()
 
     private func tap(_ destination: ProfileDestination?) -> (() -> Void)? {
         guard let destination else { return nil }

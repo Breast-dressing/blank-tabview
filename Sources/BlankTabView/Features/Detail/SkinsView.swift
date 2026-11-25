@@ -130,18 +130,18 @@ struct SkinsView: View {
 
     var body: some View {
         List {
+            // 成员信息是独立的一行（卡片本身透明），内容左右与下方卡片文字对齐。
+            Section {
+                headerRow
+            }
+            // 与第一张系列卡片零间距：卡片直接贴在这块透明区域下方。
+            .listSectionSpacing(.custom(0))
+
             if model.groups.isEmpty {
-                Section {
-                    headerRow
-                    stateRow
-                }
+                stateRow
             } else {
-                ForEach(Array(model.groups.enumerated()), id: \.offset) { index, group in
+                ForEach(model.groups) { group in
                     Section {
-                        // 成员信息就是第一张卡片的第一行，系列卡片直接接在下面，不再空一段。
-                        if index == 0 {
-                            headerRow
-                        }
                         seriesRow(group)
                         SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
                             selectedSeries = group.name
@@ -153,9 +153,7 @@ struct SkinsView: View {
                 }
 
                 if model.scanning {
-                    Section {
-                        scanningRow
-                    }
+                    scanningRow
                 }
             }
         }
@@ -193,9 +191,11 @@ struct SkinsView: View {
             unit: "款"
         )
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 8)
+        // 底部留出与卡片之间一致的间距，紧接下面的第一张卡片。
+        .padding(.bottom, 20)
         .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
     }
 

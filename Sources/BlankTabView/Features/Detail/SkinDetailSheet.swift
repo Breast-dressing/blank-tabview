@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（固定 369 高度、默认液态玻璃背景、隐藏抓手、内容不滚动）。
+/// 单个皮肤详情：原生 sheet（固定 369 高度、普通材质背景、隐藏抓手、内容不滚动）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -70,9 +70,10 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 369，背景仍由系统液态玻璃提供，不自己铺底色。
+        // 固定 369，不改圆角与高度，只把背景材质换成普通材质以禁用 Liquid Glass。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
+        .presentationBackground(.regularMaterial)
         .presentationCornerRadius(36)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
