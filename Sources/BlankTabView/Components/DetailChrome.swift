@@ -7,6 +7,8 @@ import SwiftUI
 extension View {
     func memberInfoRow(top: CGFloat = 8, bottom: CGFloat = 20) -> some View {
         self
+            // 列表行默认左右各缩进 16，这里反向抵消，内容左右与下方卡片边缘齐平。
+            .padding(.horizontal, -16)
             .listRowInsets(EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
