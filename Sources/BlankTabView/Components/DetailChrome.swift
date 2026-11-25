@@ -5,10 +5,9 @@ import SwiftUI
 /// 成员信息行：透明容器，内容左右与下方卡片边缘对齐，底部留出与卡片一致的间距。
 /// 供乐迷皮肤、系列详情、已获得奖章、勋章模块等页面统一使用。
 extension View {
-    func memberInfoRow(top: CGFloat = 8, inset: CGFloat = 16, bottom: CGFloat = 20) -> some View {
+    func memberInfoRow(top: CGFloat = 8, bottom: CGFloat = 20) -> some View {
         self
-            // 行内缩进归零，内容区就是整行宽度，再用 16pt 左右内边距收到卡片边缘，两侧对称。
-            .padding(.horizontal, inset)
+            // 缩进归零即可：行内容区本身就在 16pt 处，正好压住卡片左右边缘，两侧对称不裁切。
             .listRowInsets(EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
