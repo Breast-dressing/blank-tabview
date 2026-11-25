@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生半屏 sheet（默认液态玻璃背景、隐藏抓手、内容不滚动）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -12,10 +12,7 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    /// 基准高度：工具栏 44 + 图片 280 + 间距 8 + 两行文本 42 + 底部边距 20。
-    private static let baseHeight: CGFloat = 44 + 280 + 8 + 42 + 20
     @State private var imageHeight: CGFloat = 280
-    @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -53,7 +50,6 @@ struct SkinDetailSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -71,11 +67,9 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 394，图片比 280 矮时把差值减掉，底部不出现多出来的空白。
-        .presentationDetents([.height(sheetHeight)])
+        // 默认半屏 + 系统自带液态玻璃背景，不自己铺白条底色。
+        .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
-        // 背景由内容自己画；sheet 容器保持透明，均匀圆角不会被直角底色盖住。
-        .presentationBackground(.clear)
         .presentationCornerRadius(36)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
@@ -107,7 +101,6 @@ struct SkinDetailSheet: View {
                 let ratio = image.size.height / max(1, image.size.width)
                 let height = min(280, maxWidth * ratio)
                 imageHeight = height
-                sheetHeight = SkinDetailSheet.baseHeight - (280 - height)
             }
         }
     }
