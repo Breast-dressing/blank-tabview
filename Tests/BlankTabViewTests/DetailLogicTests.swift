@@ -30,6 +30,7 @@ final class DetailLogicTests: XCTestCase {
 
         store.saveSkinCache(
             "3069960",
+            memberId: "",
             skins: [
                 SkinItem(id: "3069960-1", seq: 1, name: "无皮肤"),
                 SkinItem(id: "3069960-2", seq: 2, name: "有皮肤", pic: "https://x/2.png"),
@@ -39,6 +40,28 @@ final class DetailLogicTests: XCTestCase {
 
         XCTAssertEqual(store.skinCache("3069960").map(\.seq), [2, 5])
         XCTAssertTrue(store.skinCache("unknown").isEmpty)
+    }
+
+    /// 同一个勋章 ID 在不同成员下必须分开存，避免其他成员看到展示成员的皮肤。
+    func testSkinCacheIsolatedPerMember() throws {
+        let name = "blanktabview.tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = AppStore(defaults: defaults)
+
+        store.saveSkinCache(
+            "3069960",
+            memberId: "owner",
+            skins: [SkinItem(id: "3069960-1", seq: 1, name: "本人", pic: "https://x/1.png")]
+        )
+        store.saveSkinCache(
+            "3069960",
+            memberId: "other",
+            skins: [SkinItem(id: "3069960-2", seq: 2, name: "别人", pic: "https://x/2.png")]
+        )
+
+        XCTAssertEqual(store.skinCache("3069960", memberId: "owner").map(\.seq), [1])
+        XCTAssertEqual(store.skinCache("3069960", memberId: "other").map(\.seq), [2])
     }
 
     func testParseItemsFromCards() {
