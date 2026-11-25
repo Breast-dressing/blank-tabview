@@ -156,47 +156,78 @@ final class MedalRepository: @unchecked Sendable {
         store.skinCache(medalId)
     }
 
-    /// 渐进扫描：每扫完一批就回调最新列表，UI 无需等待全量。
-    /// 20 个 seq 一批（外层 100 一档），连续 100 个空位就停止，最多扫到 2000。
+    /// 渐进扫描：从 1 开始逐个序号解析，连续 50 个序号没有皮肤就停止，最多扫到 2000。
+    ///
+    /// - 展示成员（拥有该勋章）：把「没有皮肤」的序号按勋章名字记下来，供同名字的勋章复用；
+    ///   已落盘的皮肤不再重复解析，再次进入时从最后一个有序号的第 40 个序号（含自身）继续往后扫。
+    /// - 其他成员：跳过同名字勋章已记录的空序号，且不写空序号记录，下次仍从 1 开始。
     func scanSkins(
         medalId: String,
+        medalName: String,
         uin: String,
-        chunkSize: Int = 100,
+        isOwner: Bool,
+        batchSize: Int = 20,
         isActive: @escaping () -> Bool,
         onUpdate: @escaping ([SkinItem]) -> Void
     ) async {
-        var currentSeq = 1
-        var emptyStreak = 0
         var map: [Int: SkinItem] = [:]
-
         for skin in store.skinCache(medalId) {
             map[skin.seq] = skin
         }
         if !map.isEmpty { onUpdate(sortedSkins(map)) }
 
+        // 展示成员写记录、其他成员只读记录。
+        var emptySeqs = isOwner ? Set(store.skinEmptySeqs(medalName)) : []
+        let skipSeqs: Set<Int> = isOwner ? [] : Set(store.skinEmptySeqs(medalName))
+
+        var currentSeq = 1
+        if isOwner, let last = map.keys.max() {
+            // 从最后一个有皮肤的序号往前数（含自身）第 40 个序号重新开始。
+            currentSeq = Swift.max(1, last - 39)
+        }
+
         let total = (try? await skinTotal(medalId: medalId, encUin: uin))?.total
+        var emptyStreak = 0
 
         while isActive() {
-            if emptyStreak >= 100 || currentSeq > 2000 { break }
+            if emptyStreak >= 50 || currentSeq > 2000 { break }
             if let total, total > 0, map.count >= total { break }
 
-            let seqs = (0..<chunkSize).map { currentSeq + $0 }
-            let result = await api.fetchSkinSeqs(uin: uin, seqs: seqs, medalId: medalId)
-            var hasSkin = false
-            for skin in result {
-                map[skin.seq] = skin
-                if !skin.pic.isEmpty { hasSkin = true }
+            // 组装本批待解析序号：跳过已知空序号与已落盘的序号，已存数据不更新。
+            var seqs: [Int] = []
+            while seqs.count < batchSize && currentSeq <= 2000 {
+                let seq = currentSeq
+                currentSeq += 1
+                if skipSeqs.contains(seq) || map[seq] != nil { continue }
+                seqs.append(seq)
             }
-            emptyStreak = hasSkin ? 0 : emptyStreak + chunkSize
-            currentSeq += chunkSize
+            guard !seqs.isEmpty else { break }
+
+            let result = await api.fetchSkinSeqs(uin: uin, seqs: seqs, medalId: medalId)
+            var got: [Int: SkinItem] = [:]
+            for skin in result where !skin.pic.isEmpty {
+                got[skin.seq] = skin
+            }
+            for seq in seqs {
+                if let skin = got[seq] {
+                    map[seq] = skin
+                    emptyStreak = 0
+                } else {
+                    emptyStreak += 1
+                    if isOwner { emptySeqs.insert(seq) }
+                }
+            }
 
             let skins = sortedSkins(map)
-            if !skins.isEmpty {
-                onUpdate(skins)
-                store.saveSkinCache(medalId, skins: skins)
-            }
+            if !skins.isEmpty { onUpdate(skins) }
+            store.saveSkinCache(medalId, skins: skins)
+            if isOwner { store.saveSkinEmptySeqs(medalName, seqs: emptySeqs.sorted()) }
         }
-        store.saveSkinCache(medalId, skins: sortedSkins(map))
+
+        let skins = sortedSkins(map)
+        store.saveSkinCache(medalId, skins: skins)
+        if isOwner { store.saveSkinEmptySeqs(medalName, seqs: emptySeqs.sorted()) }
+        if !skins.isEmpty { onUpdate(skins) }
     }
 
     private func sortedSkins(_ map: [Int: SkinItem]) -> [SkinItem] {

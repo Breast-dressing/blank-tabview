@@ -20,6 +20,7 @@ final class AppStore: @unchecked Sendable {
         static let familyArtistPrefix = "family_artist_"
         static let medalDataPrefix = "medal_data_"
         static let medalSkinsPrefix = "medal_skins_"
+        static let skinEmptyPrefix = "medal_skin_empty_v1_"
     }
 
     private let defaults: UserDefaults
@@ -195,5 +196,18 @@ final class AppStore: @unchecked Sendable {
     func saveSkinCache(_ medalId: String, skins: [SkinItem]) {
         guard let data = try? JSONEncoder().encode(skins) else { return }
         defaults.set(data, forKey: Key.medalSkinsPrefix + medalId)
+    }
+
+    // MARK: - 皮肤空序号（按勋章名字共享）
+
+    /// 展示成员解析过的「没有皮肤」的序号，同名字的勋章解析时可直接跳过。
+    func skinEmptySeqs(_ medalName: String) -> [Int] {
+        guard !medalName.isEmpty else { return [] }
+        return defaults.array(forKey: Key.skinEmptyPrefix + medalName) as? [Int] ?? []
+    }
+
+    func saveSkinEmptySeqs(_ medalName: String, seqs: [Int]) {
+        guard !medalName.isEmpty else { return }
+        defaults.set(seqs, forKey: Key.skinEmptyPrefix + medalName)
     }
 }
