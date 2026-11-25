@@ -1,7 +1,5 @@
 name: UI Screenshot
 
-# 临时截图工作流：在 xcode-27 上编译模拟器版本，启动 App 逐页截图，
-# 用于交付前人工核对界面（用完即删，不替代 Build & Test）。
 on:
   push:
     branches: [main]
@@ -52,6 +50,12 @@ jobs:
             xcrun simctl io booted screenshot "build/shot-$tab.png"
             echo "shot $tab done"
           done
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkin 2>&1 | tee build/launch-sheet.txt
+          sleep 6
+          xcrun simctl io booted screenshot "build/shot-sheet.png"
+          echo "shot sheet done"
+
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true
           for f in ~/Library/Logs/DiagnosticReports/*BlankTabView*; do
