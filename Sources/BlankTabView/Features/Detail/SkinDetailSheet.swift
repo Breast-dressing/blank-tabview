@@ -12,10 +12,10 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    /// 图片最大显示高度：280 实测偏高，收到 250。
-    static let maxImageHeight: CGFloat = 250
-    /// 固定高度：工具栏 55 + 图片 250 + 间距 8 + 两行文本 42 + 底部 10 = 365。
-    private static let baseHeight: CGFloat = 55 + SkinDetailSheet.maxImageHeight + 8 + 42 + 10
+    /// 图片最大显示高度：280 实测偏高，收到 235。
+    static let maxImageHeight: CGFloat = 235
+    /// 固定高度：工具栏 55 + 图片 235 + 间距 8 + 两行文本 42 + 底部 18 = 358。
+    private static let baseHeight: CGFloat = 55 + SkinDetailSheet.maxImageHeight + 8 + 42 + 18
     /// 图片按真实宽高比算出来的显示高度（最大 maxImageHeight）。
     @State private var imageHeight: CGFloat = SkinDetailSheet.maxImageHeight
     @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
@@ -79,7 +79,7 @@ struct SkinDetailSheet: View {
         // zoom 过渡期间不会露出直角底色。
         .background(Color(uiColor: .systemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-        // 固定 365，图片比 250 矮时把差值减掉，底部不出现多出来的空白。
+        // 固定 358，图片比 235 矮时把差值减掉，底部不出现多出来的空白。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
         // 背景交给内容自己画，sheet 容器只保留圆角，避免 zoom 过渡时露出直角底色。
