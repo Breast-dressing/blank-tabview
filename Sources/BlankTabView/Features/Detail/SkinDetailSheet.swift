@@ -95,7 +95,12 @@ struct SkinDetailSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .task(id: skin.pic) {
-            let loaded = localImage ?? (await RemoteImageLoader.image(for: skin.pic))
+            let loaded: UIImage?
+            if let localImage {
+                loaded = localImage
+            } else {
+                loaded = await RemoteImageLoader.image(for: skin.pic)
+            }
             image = loaded
             if let image = loaded {
                 let maxWidth = UIScreen.main.bounds.width - 40
