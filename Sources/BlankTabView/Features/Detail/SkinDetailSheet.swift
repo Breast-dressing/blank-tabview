@@ -54,8 +54,6 @@ struct SkinDetailSheet: View {
             .padding(.bottom, 20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(uiColor: .systemGroupedBackground))
-            .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -73,9 +71,6 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 整棵 sheet 子树统一 36 圆角裁切，zoom 过渡期间不露直角底色。
-        .background(Color(uiColor: .systemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
         // 固定 394，图片比 280 矮时把差值减掉，底部不出现多出来的空白。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
