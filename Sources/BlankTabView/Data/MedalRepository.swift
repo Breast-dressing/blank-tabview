@@ -6,7 +6,7 @@ final class MedalRepository: @unchecked Sendable {
     private let store: AppStore
     private let api: QqApi
 
-    private var pageCache: [String: (expire: Date, page: MedalHallPage)] = [:]
+    private var pageCache: [String: (expire: Date, page: MedalHallPage)] = [:] 
     private var pageInflight: [String: Task<MedalHallPage, Error>] = [:]
     private var rankCache: [String: (expire: Date, page: RankPageData)] = [:]
     private var rankInflight: [String: Task<RankPageData, Error>] = [:]
@@ -158,8 +158,8 @@ final class MedalRepository: @unchecked Sendable {
 
     /// 渐进扫描：从 1 开始逐个序号解析，连续 50 个序号没有皮肤就停止，最多扫到 2000。
     ///
-    /// - 展示成员（拥有该勋章）：把「没有皮肤」的序号按勋章名字记下来，供同名字的勋章复用；
-    ///   已落盘的皮肤不再重复解析，再次进入时从最后一个有序号的第 40 个序号（含自身）继续往后扫。
+    /// - 展示成员（拥有该勋章）：空序号按勋章名字记录，供同名字的勋章复用；
+    ///   再次进入时从最后一个有序号的第 40 个序号（含自身）重扫一遍做校验，再继续往后。
     /// - 其他成员：跳过同名字勋章已记录的空序号，且不写空序号记录，下次仍从 1 开始。
     func scanSkins(
         medalId: String,
@@ -181,24 +181,26 @@ final class MedalRepository: @unchecked Sendable {
         let skipSeqs: Set<Int> = isOwner ? [] : Set(store.skinEmptySeqs(medalName))
 
         var currentSeq = 1
+        // 校验窗口的左边界：本人已有缓存时，这段序号重新解析一遍做校验。
+        var verifyFrom = Int.max
         if isOwner, let last = map.keys.max() {
-            // 从最后一个有皮肤的序号往前数（含自身）第 40 个序号重新开始。
             currentSeq = Swift.max(1, last - 39)
+            verifyFrom = currentSeq
         }
 
-        let total = (try? await skinTotal(medalId: medalId, encUin: uin))?.total
+        // 终止只看「连续 50 个序号没有皮肤」：不能用皮肤总数提前收工（总数不一定准确）。
         var emptyStreak = 0
 
         while isActive() {
             if emptyStreak >= 50 || currentSeq > 2000 { break }
-            if let total, total > 0, map.count >= total { break }
 
-            // 组装本批待解析序号：跳过已知空序号与已落盘的序号，已存数据不更新。
+            // 组装本批待解析序号：跳过已知空序号；已落盘的在校验窗口外不重复请求。
             var seqs: [Int] = []
             while seqs.count < batchSize && currentSeq <= 2000 {
                 let seq = currentSeq
                 currentSeq += 1
-                if skipSeqs.contains(seq) || map[seq] != nil { continue }
+                if skipSeqs.contains(seq) { continue }
+                if map[seq] != nil && seq < verifyFrom { continue }
                 seqs.append(seq)
             }
             guard !seqs.isEmpty else { break }
@@ -212,9 +214,12 @@ final class MedalRepository: @unchecked Sendable {
                 if let skin = got[seq] {
                     map[seq] = skin
                     emptyStreak = 0
+                    emptySeqs.remove(seq)
                 } else {
                     emptyStreak += 1
                     if isOwner { emptySeqs.insert(seq) }
+                    // 校验时发现已存序号实际没皮肤（已失效）也要从缓存里去掉。
+                    if seq >= verifyFrom { map.removeValue(forKey: seq) }
                 }
             }
 
