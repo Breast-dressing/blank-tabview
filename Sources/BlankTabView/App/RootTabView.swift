@@ -33,6 +33,15 @@ struct RootTabView: View {
                 localImage: Self.demoImage
             )
         }
+        // 仅用于 CI 截图核对：-demoSkinLocked 时弹出未解锁皮肤的弹窗（核对「去获取」按钮）。
+        .sheet(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoSkinLocked"))) {
+            SkinDetailSheet(
+                skin: Self.demoSkinLocked,
+                seriesName: "系列 1",
+                uin: "demo",
+                localImage: Self.demoImage
+            )
+        }
         // 仅用于 CI 截图核对：-demoSeries 时直接展示系列详情页。
         .fullScreenCover(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoSeries"))) {
             NavigationStack {
@@ -80,6 +89,18 @@ struct RootTabView: View {
         skin.seqNo = "-"
         skin.unlockedDate = "2025-12-09"
         skin.userCount = 18033
+        return skin
+    }
+
+    /// 未解锁皮肤：用于核对弹窗里的「去获取」按钮。
+    private static var demoSkinLocked: SkinItem {
+        var skin = SkinItem()
+        skin.id = "demo-locked"
+        skin.name = "100日晨星天使"
+        skin.seqNo = "NO.3"
+        skin.unlockedDate = ""
+        skin.userCount = 0
+        skin.isUnlocked = false
         return skin
     }
 

@@ -13,25 +13,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  shot:
-    name: simulator screenshots
+  shots:
     runs-on: xcode-27
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate project
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen generate
 
       - name: Build for simulator
         run: |
           set -euo pipefail
-          sudo xcode-select -s /Applications/Xcode_27.2.app
-          curl -fLsS https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
-          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
-          unzip -oq "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
-          export PATH="$RUNNER_TEMP/xcodegen/bin:$PATH"
-          xcodegen generate
-          xcodebuild build \
-            -project BlankTabView.xcodeproj -scheme BlankTabView \
-            -destination "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2" \
+          xcodebuild -project BlankTabView.xcodeproj -scheme BlankTabView \
+            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2' \
             -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO
 
       - name: Screenshot each tab
@@ -55,6 +52,11 @@ jobs:
           sleep 9
           xcrun simctl io booted screenshot "build/shot-sheet.png"
           echo "shot sheet done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkinLocked 2>&1 | tee build/launch-skinlocked.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-skinlocked.png"
+          echo "shot locked skin done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkins 2>&1 | tee build/launch-skins.txt
           sleep 9
