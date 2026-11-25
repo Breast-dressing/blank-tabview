@@ -14,7 +14,7 @@ struct SkinDetailSheet: View {
 
     @State private var imageHeight: CGFloat = 280
 
-    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 两行文本，图片按比例变矮时扣掉差值。
+    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 文本。
     private static let baseHeight: CGFloat = 369
     @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
@@ -37,18 +37,32 @@ struct SkinDetailSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 imageView
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
-                        .font(.system(size: 19, weight: .bold))
+                if skin.isUnlocked {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
+                            .font(.system(size: 19, weight: .bold))
 
-                    HStack(spacing: 8) {
-                        if !skin.unlockedDate.isEmpty {
-                            Text(skin.unlockedDate)
+                        HStack(spacing: 8) {
+                            if !skin.unlockedDate.isEmpty {
+                                Text(skin.unlockedDate)
+                            }
+                            Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
                         }
-                        Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                } else {
+                    // 未解锁：编号 / 日期 / 人数位置换成「去获取」，直接用系统的液态玻璃按钮。
+                    Button {
+                        openInQQMusic()
+                    } label: {
+                        Text("去获取")
+                            .font(.system(size: 15, weight: .semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
                 }
             }
             .padding(.horizontal, 20)
@@ -73,6 +87,12 @@ struct SkinDetailSheet: View {
         // 固定 369 高；材质与圆角都画在内容上，zoom 动画全过程不会露出直角。
         .detailSheetChrome(height: sheetHeight)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
+    }
+
+    /// 用 QQ 音乐打开这张皮肤对应的页面。
+    private func openInQQMusic() {
+        guard let url = URL(string: link) else { return }
+        UIApplication.shared.open(url)
     }
 
     private var imageView: some View {
