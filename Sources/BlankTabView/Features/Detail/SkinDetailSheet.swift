@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+extension SkinItem: Identifiable {}
+
 /// 单个皮肤详情：原生 sheet（固定 369 高度、默认液态玻璃背景、隐藏抓手、内容不滚动）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
