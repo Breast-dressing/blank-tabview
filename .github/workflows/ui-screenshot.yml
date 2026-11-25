@@ -46,28 +46,28 @@ jobs:
           for tab in home profile search; do
             xcrun simctl terminate booted com.breastdressing.blanktabview || true
             xcrun simctl launch booted com.breastdressing.blanktabview -startTab "$tab" 2>&1 | tee "build/launch-$tab.txt"
-            sleep 6
+            sleep 9
             xcrun simctl io booted screenshot "build/shot-$tab.png"
             echo "shot $tab done"
           done
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkin 2>&1 | tee build/launch-sheet.txt
-          sleep 6
+          sleep 9
           xcrun simctl io booted screenshot "build/shot-sheet.png"
           echo "shot sheet done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkins 2>&1 | tee build/launch-skins.txt
-          sleep 6
+          sleep 9
           xcrun simctl io booted screenshot "build/shot-skins.png"
           echo "shot skins done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSeries 2>&1 | tee build/launch-series.txt
-          sleep 6
+          sleep 9
           xcrun simctl io booted screenshot "build/shot-series.png"
           echo "shot series done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoMedalSheet 2>&1 | tee build/launch-medalsheet.txt
-          sleep 6
+          sleep 9
           xcrun simctl io booted screenshot "build/shot-medalsheet.png"
           echo "shot medal sheet done"
 
