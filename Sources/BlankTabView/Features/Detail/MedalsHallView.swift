@@ -122,60 +122,57 @@ struct MedalsHallView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
-            MemberSectionHeader(
-                title: model.member.title,
-                pic: model.member.pic,
-                subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
-                count: "\(model.medalUnlocked)",
-                unit: "枚"
-            )
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+        List {
+            // 成员信息就是列表第一行，平铺滚动，不包卡片。
+            Section {
+                MemberSectionHeader(
+                    title: model.member.title,
+                    pic: model.member.pic,
+                    subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
+                    count: "\(model.medalUnlocked)",
+                    unit: "枚"
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
 
-            List {
-                if model.tabs.count > 1 {
-                    Section {
-                        PillTabsView(
-                            titles: model.tabs.map { Fmt.cleanTabName($0.name) },
-                            selected: model.selectedIndex,
-                            errorIndexes: model.errorIndexes,
-                            onSelect: { index in Task { await model.select(index) } }
-                        )
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
-                    }
-                }
-
-                ForEach(Array(moduleSections.enumerated()), id: \.offset) { _, pair in
-                    moduleSection(pair.module, tabName: pair.tabName)
-                }
-
-                if model.loading {
-                    StateNotice(title: "正在读取勋章数据…", progress: true)
-                        .listRowBackground(Color.clear)
-                } else if let error = model.error {
-                    StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
-                        Task { await model.load() }
-                    }
-                    .listRowBackground(Color.clear)
-                } else if let current = model.current, !current.success {
-                    StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
-                        Task { await model.load() }
-                    }
-                    .listRowBackground(Color.clear)
-                } else if moduleSections.isEmpty {
-                    StateNotice(title: "暂无奖章数据")
-                        .listRowBackground(Color.clear)
+            if model.tabs.count > 1 {
+                Section {
+                    PillTabsView(
+                        titles: model.tabs.map { Fmt.cleanTabName($0.name) },
+                        selected: model.selectedIndex,
+                        errorIndexes: model.errorIndexes,
+                        onSelect: { index in Task { await model.select(index) } }
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
                 }
             }
-            .listStyle(.insetGrouped)
-            .listSectionSpacing(.compact)
-            .scrollContentBackground(.hidden)
+
+            ForEach(Array(moduleSections.enumerated()), id: \.offset) { _, pair in
+                moduleSection(pair.module, tabName: pair.tabName)
+            }
+
+            if model.loading {
+                StateNotice(title: "正在读取勋章数据…", progress: true)
+                    .listRowBackground(Color.clear)
+            } else if let error = model.error {
+                StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+            } else if let current = model.current, !current.success {
+                StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+            } else if moduleSections.isEmpty {
+                StateNotice(title: "暂无奖章数据")
+                    .listRowBackground(Color.clear)
+            }
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle("已获得奖章")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }

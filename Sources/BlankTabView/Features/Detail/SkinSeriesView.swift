@@ -21,38 +21,35 @@ struct SkinSeriesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 头部平铺在页面里，不包卡片；边距与卡片容器一致（20）。
-            MemberSectionHeader(
-                title: member.title,
-                pic: member.pic,
-                subtitle: headerSubtitle,
-                count: "\(unlockedCount)",
-                unit: "款"
-            )
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+        List {
+            // 成员信息就是列表第一行，平铺滚动，不包卡片。
+            Section {
+                MemberSectionHeader(
+                    title: member.title,
+                    pic: member.pic,
+                    subtitle: headerSubtitle,
+                    count: "\(unlockedCount)",
+                    unit: "款"
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
 
-            List {
-                Section {
-                    if skins.isEmpty {
-                        StateNotice(title: "这个系列还没有皮肤")
-                            .listRowBackground(Color.clear)
-                    } else {
-                        SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
-                            selectedSkin = skin
-                        }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
-                        .listRowSeparator(.hidden)
+            Section {
+                if skins.isEmpty {
+                    StateNotice(title: "这个系列还没有皮肤")
+                        .listRowBackground(Color.clear)
+                } else {
+                    SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
+                        selectedSkin = skin
                     }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
+                    .listRowSeparator(.hidden)
                 }
             }
-            .listStyle(.insetGrouped)
-            .listSectionSpacing(.compact)
-            .scrollContentBackground(.hidden)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
         .navigationTitle(seriesName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedSkin) { skin in

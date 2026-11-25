@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、隐藏抓手）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -12,8 +12,10 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    /// 基准高度：工具栏 44 + 图片 280 + 间距 8 + 两行文本 42 + 底部边距 20。
-    private static let baseHeight: CGFloat = 44 + 280 + 8 + 42 + 20
+    /// 固定高度：工具栏 44 + 图片 280 + 间距 8 + 两行文本 42 = 374。
+    /// 不再额外加底部留白：394 时实测文本下方多出约 20pt 空白。
+    private static let baseHeight: CGFloat = 44 + 280 + 8 + 42
+    /// 图片按真实宽高比算出来的显示高度（最大 280）。
     @State private var imageHeight: CGFloat = 280
     @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
@@ -51,9 +53,10 @@ struct SkinDetailSheet: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color(uiColor: .systemGroupedBackground))
+            .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -71,15 +74,20 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 394，图片比 280 矮时把差值减掉，底部不出现多出来的空白。
+        // 整个 sheet 子树统一圆角裁切：内容底色 / 导航栏底色都裁成 36 圆角，
+        // zoom 过渡期间不会露出直角底色。
+        .background(Color(uiColor: .systemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+        // 固定 374，图片比 280 矮时把差值减掉，底部不出现多出来的空白。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
-        // 背景由内容自己画；sheet 容器保持透明，均匀圆角不会被直角底色盖住。
+        // 容器背景透明，shape 交给内容自绘并裁圆角。
         .presentationBackground(.clear)
         .presentationCornerRadius(36)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
 
+    /// 大图贴着工具栏，加载中在中心显示系统 ProgressView。
     private var imageView: some View {
         ZStack {
             if let image {
@@ -114,6 +122,7 @@ struct SkinDetailSheet: View {
 }
 
 extension Color {
+    /// "#FAFAFA" / "#FFF" → Color。
     init?(hex: String) {
         var text = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.hasPrefix("#") { text.removeFirst() }
