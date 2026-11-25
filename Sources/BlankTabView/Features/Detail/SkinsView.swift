@@ -347,7 +347,7 @@ struct SkinTileGrid: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(Color.clear)
                 )
-                .matchedTransitionSourceIfAvailable(id: skin.id, in: zoomNS)
+                .matchedTransitionSourceIfAvailable(id: skin.id, in: zoomNamespace)
             }
         }
     }
