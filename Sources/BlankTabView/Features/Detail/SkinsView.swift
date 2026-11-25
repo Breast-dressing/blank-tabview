@@ -68,7 +68,7 @@ final class SkinsModel: ObservableObject {
             return
         }
 
-        let cached = services.medals.cachedSkins(medalId)
+        let cached = services.medals.cachedSkins(medalId, memberId: memberId)
         skins = cached
         total = cached.count
         scanning = true
@@ -194,6 +194,8 @@ struct SkinsView: View {
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(.compact)
+        // 成员信息紧贴工具栏：去掉列表默认的顶部内边距，样式不变。
+        .contentMargins(.top, 0, for: .scrollContent)
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
