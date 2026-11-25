@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（内容不滚动、固定高度、禁用液态玻璃、隐藏抓手）。
+/// 单个皮肤详情：原生 sheet（内容不滚动、高度按内容实测、隐藏抓手）。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -14,11 +14,12 @@ struct SkinDetailSheet: View {
 
     /// 图片最大显示高度：280 实测偏高，收到 235。
     static let maxImageHeight: CGFloat = 235
-    /// 固定高度：工具栏 55 + 图片 235 + 间距 8 + 两行文本 42 + 底部 8 = 348。
-    private static let baseHeight: CGFloat = 55 + SkinDetailSheet.maxImageHeight + 8 + 42 + 8
+    /// 导航栏高度 + 底部留白，用来把内容实测高度换成 sheet 高度。
+    private static let sheetChrome: CGFloat = 55 + 8
     /// 图片按真实宽高比算出来的显示高度（最大 maxImageHeight）。
     @State private var imageHeight: CGFloat = SkinDetailSheet.maxImageHeight
-    @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
+    /// 由内容实测高度决定，避免硬编码 394 导致底部多出空白。
+    @State private var sheetHeight: CGFloat = 360
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -55,7 +56,19 @@ struct SkinDetailSheet: View {
             }
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(
+                GeometryReader { geo in
+                    Color(uiColor: .systemGroupedBackground)
+                        .preference(key: SheetContentHeightKey.self, value: geo.size.height)
+                }
+            )
+            .onPreferenceChange(SheetContentHeightKey.self) { height in
+                guard height > 0 else { return }
+                let target = height + SkinDetailSheet.sheetChrome
+                Task { @MainActor in
+                    if abs(target - sheetHeight) > 0.5 { sheetHeight = target }
+                }
+            }
             .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
@@ -79,7 +92,6 @@ struct SkinDetailSheet: View {
         // zoom 过渡期间不会露出直角底色。
         .background(Color(uiColor: .systemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-        // 固定 348，图片比 235 矮时把差值减掉，底部不出现多出来的空白。
         .presentationDetents([.height(sheetHeight)])
         .presentationDragIndicator(.hidden)
         // 背景交给内容自己画，sheet 容器只保留圆角，避免 zoom 过渡时露出直角底色。
@@ -116,9 +128,16 @@ struct SkinDetailSheet: View {
                 let ratio = image.size.height / max(1, image.size.width)
                 let height = min(SkinDetailSheet.maxImageHeight, maxWidth * ratio)
                 imageHeight = height
-                sheetHeight = SkinDetailSheet.baseHeight - (SkinDetailSheet.maxImageHeight - height)
             }
         }
+    }
+}
+
+/// 内容实测高度偏好值。
+private struct SheetContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
