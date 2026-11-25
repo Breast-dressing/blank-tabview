@@ -30,7 +30,7 @@ struct SkinSeriesView: View {
                     count: "\(unlockedCount)",
                     unit: "款"
                 )
-                .memberInfoRow(pull: 20)
+                .memberInfoRow(inset: 8)
             }
             .listSectionSpacing(.custom(0))
 
