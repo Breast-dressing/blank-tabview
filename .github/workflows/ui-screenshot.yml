@@ -13,22 +13,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  shots:
+  shot:
+    name: simulator screenshots
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-
-      - name: Generate project
-        run: |
-          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
-          xcodegen generate
 
       - name: Build for simulator
         run: |
           set -euo pipefail
-          xcodebuild -project BlankTabView.xcodeproj -scheme BlankTabView \
-            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2' \
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          curl -fLsS https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -oq "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP/xcodegen/bin:$PATH"
+          xcodegen generate
+          xcodebuild build \
+            -project BlankTabView.xcodeproj -scheme BlankTabView \
+            -destination "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2" \
             -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO
 
       - name: Screenshot each tab
