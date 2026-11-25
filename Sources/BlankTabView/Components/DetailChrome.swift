@@ -7,7 +7,7 @@ import SwiftUI
 extension View {
     func memberInfoRow(top: CGFloat = 8, bottom: CGFloat = 20) -> some View {
         self
-            .listRowInsets(EdgeInsets(top: top, leading: -16, bottom: bottom, trailing: -16))
+            .listRowInsets(EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
     }
@@ -22,9 +22,13 @@ struct DetailSheetChrome: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // 自己铺满整块材质并裁剪成圆角：动画过程中容器边角不会露出直角。
-            .background(.regularMaterial, ignoresSafeAreaEdges: .all)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            // 材质自己画成圆角矩形并铺到屏幕底部：动画过程中容器边角不会露出直角，
+            // 也不会因为忽略安全区而把 sheet 布局撑高。
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.regularMaterial)
+                    .ignoresSafeArea(edges: .bottom)
+            }
             .presentationDetents([.height(height)])
             .presentationDragIndicator(.hidden)
             .presentationBackground(.clear)
