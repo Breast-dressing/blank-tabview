@@ -130,50 +130,19 @@ struct SkinsView: View {
 
     var body: some View {
         List {
-            // 成员信息是列表第一行。内容自身留出边距，避开卡片圆角，不会被裁剪。
-            Section {
-                MemberSectionHeader(
-                    title: model.member.title,
-                    pic: model.member.pic,
-                    subtitle: model.headerSubtitle,
-                    count: "\(model.displayTotal)",
-                    unit: "款"
-                )
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-            // 与下方第一个系列卡片零间距：卡片直接贴着成员信息。
-            .listSectionSpacing(.custom(0))
-
             if model.groups.isEmpty {
-                stateRow
+                Section {
+                    headerRow
+                    stateRow
+                }
             } else {
-                ForEach(model.groups) { group in
+                ForEach(Array(model.groups.enumerated()), id: \.offset) { index, group in
                     Section {
-                        HStack(spacing: 6) {
-                            Text(group.name)
-                                .font(.system(size: 16, weight: .semibold))
-                            Spacer(minLength: 8)
-                            Button {
-                                pendingSeries = route(for: group)
-                            } label: {
-                                HStack(spacing: 2) {
-                                    Text("已收集 \(group.unlockedCount)/\(group.skins.count)")
-                                        .font(.system(size: 14))
-                                        .monospacedDigit()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .semibold))
-                                }
-                                .foregroundStyle(.secondary)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
+                        // 成员信息就是第一张卡片的第一行，系列卡片直接接在下面，不再空一段。
+                        if index == 0 {
+                            headerRow
                         }
-                        .listRowSeparator(.hidden)
-
+                        seriesRow(group)
                         SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
                             selectedSeries = group.name
                             selectedSkin = skin
@@ -184,7 +153,9 @@ struct SkinsView: View {
                 }
 
                 if model.scanning {
-                    scanningRow
+                    Section {
+                        scanningRow
+                    }
                 }
             }
         }
@@ -210,6 +181,46 @@ struct SkinsView: View {
                 zoomNamespace: zoomNS
             )
         }
+    }
+
+    /// 成员信息行：内容自己留边距，避开卡片圆角，不会被裁剪。
+    private var headerRow: some View {
+        MemberSectionHeader(
+            title: model.member.title,
+            pic: model.member.pic,
+            subtitle: model.headerSubtitle,
+            count: "\(model.displayTotal)",
+            unit: "款"
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+    }
+
+    /// 系列标题行：系列名 + 已收集 x/y 箭头。
+    private func seriesRow(_ group: SkinSeriesGroup) -> some View {
+        HStack(spacing: 6) {
+            Text(group.name)
+                .font(.system(size: 16, weight: .semibold))
+            Spacer(minLength: 8)
+            Button {
+                pendingSeries = route(for: group)
+            } label: {
+                HStack(spacing: 2) {
+                    Text("已收集 \(group.unlockedCount)/\(group.skins.count)")
+                        .font(.system(size: 14))
+                        .monospacedDigit()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
