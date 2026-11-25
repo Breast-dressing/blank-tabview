@@ -55,6 +55,15 @@ final class SkinsModel: ObservableObject {
     }
 
     func load() async {
+        // 仅 CI 截图核对用：-demoSkins 直接喂演示数据，便于验证成员信息与第一张卡片的间距。
+        if ProcessInfo.processInfo.arguments.contains("-demoSkins") {
+            skins = Self.demoSkins
+            total = skins.count
+            scanning = false
+            error = nil
+            return
+        }
+
         let cached = services.medals.cachedSkins(medalId)
         skins = cached
         total = cached.count
@@ -87,6 +96,26 @@ final class SkinsModel: ObservableObject {
         )
         scanning = false
     }
+
+    /// 演示数据（仅 -demoSkins 截图用）。
+    static let demoSkins: [SkinItem] = {
+        var list: [SkinItem] = []
+        for series in 1...3 {
+            for index in 1...3 {
+                var skin = SkinItem()
+                skin.id = "demo-\(series)-\(index)"
+                skin.seq = index
+                skin.name = "\(series * 10)日徽章\(index)"
+                skin.categId = "\(series)"
+                skin.seqNo = "\(series * 10)日徽章\(index)"
+                skin.unlockedDate = "2025-12-0\(index)"
+                skin.userCount = 18033
+                skin.isUnlocked = index != 3
+                list.append(skin)
+            }
+        }
+        return list
+    }()
 
     var groups: [SkinSeriesGroup] {
         var buckets: [String: [SkinItem]] = [:]

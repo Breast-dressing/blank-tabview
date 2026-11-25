@@ -105,7 +105,7 @@ struct ProfilePage: View {
     static let placeholderMetrics: MemberMetrics = {
         var member = Member()
         member.title = "未添加成员"
-        member.fanBadge = "添加家族并选择成员身份后，这里会显示周榜、月榜、乐迷皮肤与奖章。"
+        member.fanBadge = "添加家族与成员后可查看数据"
         return MemberMetrics(member: member)
     }()
 
