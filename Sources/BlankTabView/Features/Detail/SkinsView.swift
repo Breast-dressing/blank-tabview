@@ -26,6 +26,8 @@ final class SkinsModel: ObservableObject {
     let medalId: String
     let medalName: String
     let scheme: String
+    /// 是否是展示成员（本人）的勋章：只有本人的勋章才记录「无皮肤序号」。
+    let isOwner: Bool
 
     @Published private(set) var skins: [SkinItem] = []
     @Published private(set) var total = 0
@@ -39,6 +41,8 @@ final class SkinsModel: ObservableObject {
         self.medalId = medalId
         self.medalName = medalName
         self.scheme = scheme
+        let canonical = MemberId.canonical(memberId)
+        self.isOwner = !canonical.isEmpty && canonical == AppServices.shared.store.selectedMemberId
         self.member = AppServices.shared.member(memberId)
     }
 
@@ -88,7 +92,9 @@ final class SkinsModel: ObservableObject {
         let flagRef = flag
         await services.medals.scanSkins(
             medalId: medalId,
+            medalName: medalName.isEmpty ? medalId : medalName,
             uin: memberId,
+            isOwner: isOwner,
             isActive: { flagRef.on },
             onUpdate: { [weak self] list in
                 Task { @MainActor in self?.skins = list }
