@@ -60,6 +60,16 @@ jobs:
           sleep 6
           xcrun simctl io booted screenshot "build/shot-skins.png"
           echo "shot skins done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSeries 2>&1 | tee build/launch-series.txt
+          sleep 6
+          xcrun simctl io booted screenshot "build/shot-series.png"
+          echo "shot series done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoMedalSheet 2>&1 | tee build/launch-medalsheet.txt
+          sleep 6
+          xcrun simctl io booted screenshot "build/shot-medalsheet.png"
+          echo "shot medal sheet done"
 
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true

@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// 系列详情：顶部成员信息（头像 / 名字 / 「艺人名字的系列名」/ 右侧该系列已获得），下面三列皮肤。
+/// 系列详情：和乐迷皮肤页同一套版式——顶部成员信息（透明容器）+ 下面三列皮肤。
 struct SkinSeriesView: View {
     let member: Member
     let artistName: String
@@ -22,7 +22,6 @@ struct SkinSeriesView: View {
 
     var body: some View {
         List {
-            // 成员信息就是列表第一行，平铺滚动，不包卡片。
             Section {
                 MemberSectionHeader(
                     title: member.title,
@@ -31,9 +30,9 @@ struct SkinSeriesView: View {
                     count: "\(unlockedCount)",
                     unit: "款"
                 )
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
+                .memberInfoRow()
             }
+            .listSectionSpacing(.custom(0))
 
             Section {
                 if skins.isEmpty {

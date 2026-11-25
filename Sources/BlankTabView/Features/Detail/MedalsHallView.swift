@@ -123,7 +123,7 @@ struct MedalsHallView: View {
 
     var body: some View {
         List {
-            // 成员信息就是列表第一行，平铺滚动，不包卡片。
+            // 成员信息：与乐迷皮肤页同一套透明容器，左右与卡片边缘对齐。
             Section {
                 MemberSectionHeader(
                     title: model.member.title,
@@ -132,9 +132,9 @@ struct MedalsHallView: View {
                     count: "\(model.medalUnlocked)",
                     unit: "枚"
                 )
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
+                .memberInfoRow()
             }
+            .listSectionSpacing(.custom(0))
 
             if model.tabs.count > 1 {
                 Section {

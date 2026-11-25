@@ -159,7 +159,7 @@ struct SkinsView: View {
 
     var body: some View {
         List {
-            // 成员信息是独立的一行（卡片本身透明），内容左右与下方卡片文字对齐。
+            // 成员信息是独立的一行（容器透明），左右与下方卡片边缘对齐。
             Section {
                 headerRow
             }
@@ -210,7 +210,7 @@ struct SkinsView: View {
         }
     }
 
-    /// 成员信息行：内容自己留边距，避开卡片圆角，不会被裁剪。
+    /// 成员信息行：透明容器，左右与卡片边缘对齐，底部留出与卡片一致的间距。
     private var headerRow: some View {
         MemberSectionHeader(
             title: model.member.title,
@@ -219,13 +219,7 @@ struct SkinsView: View {
             count: "\(model.displayTotal)",
             unit: "款"
         )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        // 底部留出与卡片之间一致的间距，紧接下面的第一张卡片。
-        .padding(.bottom, 20)
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
+        .memberInfoRow()
     }
 
     /// 系列标题行：系列名 + 已收集 x/y 箭头。
