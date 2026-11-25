@@ -12,7 +12,7 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    @State private var imageHeight: CGFloat = 310
+    @State private var imageHeight: CGFloat = 360
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -99,7 +99,7 @@ struct SkinDetailSheet: View {
             if let image = loaded {
                 let maxWidth = UIScreen.main.bounds.width - 40
                 let ratio = image.size.height / max(1, image.size.width)
-                let height = min(310, maxWidth * ratio)
+                let height = min(360, maxWidth * ratio)
                 imageHeight = height
             }
         }
