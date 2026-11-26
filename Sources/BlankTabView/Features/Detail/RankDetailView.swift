@@ -74,8 +74,8 @@ final class RankDetailModel: ObservableObject {
         var item = RankMember()
         item.position = position
         item.title = "乐迷用户 \(position)"
-        item.levelText = "V\(7 - min(position, 6))"
         item.wearTexts = position <= 3 ? ["铁粉"] : []
+        item.descTexts = ["贡献值 \(1000 - position * 60)"]
         item.praiseNum = 1200 - position * 45
         return item
     }
@@ -181,15 +181,12 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：名次 + 头像 + 名字（下一行是勋章等级与铭牌）+ 心动数。
+/// 榜单行：名次 + 头像 + 名字（铭牌在名字前，原副标题文本在铭牌下面一行）+ 心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
     private var name: String { item.title.isEmpty ? " " : item.title }
-
-    private var hasSubLine: Bool {
-        !item.levelText.isEmpty || !item.wearTexts.isEmpty
-    }
+    private var wears: [String] { item.wearTexts.filter { !$0.isEmpty } }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -199,10 +196,15 @@ struct RankMemberRow: View {
                 .foregroundStyle(item.position > 0 && item.position <= 3 ? Color.accentColor : Color.primary)
                 .frame(width: 24, alignment: .leading)
 
-            AvatarCircle(urlString: item.pic, size: 40)
+            // 头像与页面顶部成员信息同尺寸，且不要白边。
+            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
+                    // 勋章铭牌排在成员名字前（WearList 有几段就显示几枚）。
+                    ForEach(wears, id: \.self) { wear in
+                        Plate(text: wear)
+                    }
                     Text(name)
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
@@ -213,19 +215,12 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：勋章等级 + 勋章铭牌（WearList 有几段就显示几枚）。
-                if hasSubLine {
-                    HStack(spacing: 6) {
-                        if !item.levelText.isEmpty {
-                            Text(item.levelText)
-                                .font(.system(size: 12, weight: .semibold))
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        ForEach(item.wearTexts.filter { !$0.isEmpty }, id: \.self) { wear in
-                            Plate(text: wear)
-                        }
-                    }
+                // 名字下方那行文本保留，落在铭牌下面一行。
+                if !item.descTexts.isEmpty {
+                    Text(item.descTexts.joined(separator: " · "))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
 

@@ -281,8 +281,6 @@ struct RankMember: Hashable, Sendable {
     var title: String = ""
     var pic: String = ""
     var itemId: String = ""
-    /// 勋章等级（WearList.Title 里的 V 等级，如 V5）。
-    var levelText: String = ""
     /// 勋章铭牌文案（WearList.Segment.Contents）。
     var wearTexts: [String] = []
     var descTexts: [String] = []
