@@ -120,9 +120,7 @@ final class QqApi: @unchecked Sendable {
             if !id.isEmpty { seen.insert(id) }
         }
 
-        let remaining: [[String: Any]] = itemList
-            .filter { !seen.contains(Self.str($0["ItemID"])) }
-            .map { ["ItemID": $0["ItemID"] ?? "", "Value": $0["Value"] ?? ""] }
+        let remaining: [[String: Any]] = itemList.filter { !seen.contains(Self.str($0["ItemID"])) }
 
         if !remaining.isEmpty {
             let batch = try await cgi(
@@ -404,7 +402,7 @@ final class QqApi: @unchecked Sendable {
         return try await enrichRankDetail(medalId: params.medalId, tabType: tab.type, detail: detail)
     }
 
-    /// 首屏只带 ItemList（无头像/昵称），用 BatchGetRankItem 批量补全。
+    /// 首屏只带 ItemList（无头像/昵称/铭牌），用 BatchGetRankItem 批量补全。
     private func enrichRankDetail(medalId: String, tabType: Int, detail: [String: Any]) async throws -> RankDetail {
         let firstPage = Self.list(detail["FirstPageInfo"])
         let itemList = Self.list(detail["ItemList"])
@@ -418,10 +416,11 @@ final class QqApi: @unchecked Sendable {
             if !id.isEmpty { itemMap[id] = item }
         }
 
-        let toFetch: [[String: Any]] = itemList.compactMap { item -> [String: Any]? in
+        // 与 node server.js 一致：把 ItemList 的原始条目整体回传，服务端按 ItemID
+        // 回填昵称、头像、勋章铭牌（WearList）与贡献（DescList）。
+        let toFetch: [[String: Any]] = itemList.filter { item in
             let id = Self.str(item["ItemID"])
-            guard !id.isEmpty, itemMap[id] == nil else { return nil }
-            return ["ItemID": item["ItemID"] ?? "", "Value": item["Value"] ?? ""]
+            return !id.isEmpty && itemMap[id] == nil
         }
 
         let batchSize = 20
