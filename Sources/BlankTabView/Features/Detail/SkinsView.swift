@@ -165,17 +165,15 @@ struct SkinsView: View {
 
     var body: some View {
         List {
-            // 成员信息是独立的一行（容器透明），左右与下方卡片边缘对齐。
-            Section {
-                headerRow
-            }
-            // 与第一张系列卡片零间距：卡片直接贴在这块透明区域下方。
-            .listSectionSpacing(.custom(0))
-
+            // 成员信息直接平铺：挂在第一个分区的 header 上，不再占用一个透明卡片行。
             if model.groups.isEmpty {
-                stateRow
+                Section {
+                    stateRow
+                } header: {
+                    headerRow
+                }
             } else {
-                ForEach(model.groups) { group in
+                ForEach(Array(model.groups.enumerated()), id: \.element.id) { index, group in
                     Section {
                         seriesRow(group)
                         SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
@@ -184,11 +182,17 @@ struct SkinsView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
                         .listRowSeparator(.hidden)
+                    } header: {
+                        if index == 0 {
+                            headerRow
+                        }
                     }
                 }
 
                 if model.scanning {
-                    scanningRow
+                    Section {
+                        scanningRow
+                    }
                 }
             }
         }
@@ -218,7 +222,7 @@ struct SkinsView: View {
         }
     }
 
-    /// 成员信息行：透明容器，左右与卡片边缘对齐，底部留出与卡片一致的间距。
+    /// 成员信息：平铺的分区 header，左右与下方卡片边缘对齐。
     private var headerRow: some View {
         MemberSectionHeader(
             title: model.member.title,
@@ -227,7 +231,10 @@ struct SkinsView: View {
             count: "\(model.displayTotal)",
             unit: "款"
         )
-        .memberInfoRow()
+        .textCase(nil)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
     }
 
     /// 系列标题行：系列名 + 已收集 x/y 箭头。
