@@ -120,14 +120,8 @@ struct RankDetailView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
-            Section {
-                rows
-            } header: {
-                Text(model.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .textCase(nil)
-            }
+            // 榜名已由导航栏标题承担，不再放灰色分节标题（电话列表没有分节头）。
+            rows
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
