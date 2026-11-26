@@ -3,7 +3,7 @@ import SwiftUI
 /// 详情弹窗统一尺寸：皮肤详情与奖章详情共用同一套数值。
 enum DetailSheetMetrics {
     /// 弹窗总高：工具栏 + 图片 280 + 间距 8 + 底部行 + 底边距 16。
-    static let height: CGFloat = 412
+    static let height: CGFloat = 426
     static let mediaHeight: CGFloat = 280
     static let cornerRadius: CGFloat = 28
     static let leadingInset: CGFloat = 20
@@ -11,7 +11,6 @@ enum DetailSheetMetrics {
 }
 
 /// 皮肤 / 奖章详情共用的弹窗内容骨架：等高媒体区 + 左下两行 + 右下「打开」玻璃按钮。
-/// 所有弹窗只写这一套 UI，只是喂不同数据。
 struct DetailSheetContent<Media: View>: View {
     let primary: String
     let secondary: String
