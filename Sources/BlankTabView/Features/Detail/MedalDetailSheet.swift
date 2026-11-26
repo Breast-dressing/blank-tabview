@@ -107,10 +107,17 @@ struct MedalDetailSheet: View {
         UIApplication.shared.open(openURL)
     }
 
+    /// 分级排序后默认停在「已解锁的最高等级」上。
+    private func apply(_ raw: [MedalLevel]) {
+        let sorted = raw.sorted { $0.level < $1.level }
+        guard !sorted.isEmpty else { return }
+        levels = sorted
+        index = sorted.lastIndex(where: { $0.state == 2 }) ?? 0
+    }
+
     private func load() async {
         if let demoLevels, !demoLevels.isEmpty {
-            levels = demoLevels.sorted { $0.level < $1.level }
-            index = 0
+            apply(demoLevels)
             return
         }
         guard !target.medalId.isEmpty else { return }
@@ -120,18 +127,7 @@ struct MedalDetailSheet: View {
                 encUin: memberId
             )
             numbers = info
-            var filtered = info.levels.filter { !$0.picUrl.isEmpty }
-            if filtered.contains(where: { $0.medalId == target.medalId }) {
-                filtered = filtered.filter { $0.medalId == target.medalId || $0.medalId.isEmpty }
-            }
-            guard !filtered.isEmpty else { return }
-            let sorted = filtered.sorted { $0.level < $1.level }
-            levels = sorted
-            if let hit = sorted.firstIndex(where: { $0.medalId == target.medalId && !target.medalId.isEmpty }) {
-                index = hit
-            } else {
-                index = max(0, sorted.count - 1)
-            }
+            apply(info.levels.filter { !$0.picUrl.isEmpty })
         } catch {
             // 取不到分级就只显示点击的那一枚（编号仍可用列表卡带来的）。
         }
