@@ -21,6 +21,7 @@ final class MedalModuleModel: ObservableObject {
     @Published var sheetTarget: MedalSheetTarget?
 
     private var lastPos = ""
+    private let pageSize = 21
 
     init(memberId: String, moduleId: String, moduleName: String, tabName: String) {
         self.memberId = memberId
@@ -30,7 +31,7 @@ final class MedalModuleModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
-    var unlockedCount: Int { items.filter { $0.unlocked }.count }
+    var unlockedCount: Int { items.filter { $0.attained }.count }
 
     /// 成员信息下方文案：「的 + 系列名」。
     var headerSubtitle: String {
@@ -47,7 +48,7 @@ final class MedalModuleModel: ObservableObject {
                 url: services.hallURL(memberId),
                 moduleId: moduleId,
                 moduleName: moduleName,
-                pageSize: 50
+                pageSize: pageSize
             )
             items = page.module.items
             hasNext = page.hasNext
@@ -59,8 +60,9 @@ final class MedalModuleModel: ObservableObject {
         loading = false
     }
 
-    func loadMore() async {
-        guard hasNext, !loadingMore else { return }
+    /// 划到底自动续拉：接口自带 HasNext / LastPos，直接翻页。
+    func loadMoreIfNeeded() async {
+        guard hasNext, !loadingMore, !loading else { return }
         loadingMore = true
         do {
             let page = try await services.medals.modulePage(
@@ -68,13 +70,15 @@ final class MedalModuleModel: ObservableObject {
                 moduleId: moduleId,
                 moduleName: moduleName,
                 lastPos: lastPos,
-                pageSize: 21
+                pageSize: pageSize
             )
-            items.append(contentsOf: page.module.items)
+            let existing = Set(items.map { $0.medalId })
+            items.append(contentsOf: page.module.items.filter { !existing.contains($0.medalId) })
             hasNext = page.hasNext
             lastPos = page.lastPos
         } catch {
             hasNext = false
+            self.error = error.localizedDescription
         }
         loadingMore = false
     }
@@ -135,38 +139,36 @@ struct MedalModuleView: View {
                     ZoomedMedalTileGrid(items: MedalsHallView.placeholderItems(ns: 1), zoomNamespace: nil) { _ in }
                 }
             } else if model.items.isEmpty {
-                StateNotice(title: "这个模块还没有勋章")
-                    .padding(.horizontal, 16)
+                DetailPageNotice(StateNotice(title: "这个模块还没有勋章"))
             } else {
                 DetailSeriesCard(title: model.moduleName.isEmpty ? "全部" : model.moduleName) {
-                    ZoomedMedalTileGrid(items: model.items, zoomNamespace: zoomNS) { item in
+                    ZoomedMedalTileGrid(
+                        items: model.items,
+                        zoomNamespace: zoomNS,
+                        onLastAppear: {
+                            // 划到最后一张自动续拉，不再放「加载更多」按钮。
+                            Task { await model.loadMoreIfNeeded() }
+                        }
+                    ) { item in
                         if let route = model.openTile(item) {
                             pendingPush = route
                         }
                     }
 
-                    if model.hasNext {
-                        Button {
-                            Task { await model.loadMore() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                if model.loadingMore { ProgressView() }
-                                Text(model.loadingMore ? "正在加载…" : "加载更多")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
+                    if model.loadingMore {
+                        ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
-                        }
-                        .disabled(model.loadingMore)
                     }
                 }
             }
 
-            if let error = model.error {
-                StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
-                    Task { await model.load() }
-                }
-                .padding(.horizontal, 16)
+            if let error = model.error, !model.loading {
+                DetailPageNotice(
+                    StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
+                        Task { await model.load() }
+                    }
+                )
             }
         }
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
