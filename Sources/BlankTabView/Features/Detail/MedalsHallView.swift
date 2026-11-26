@@ -38,6 +38,8 @@ final class MedalsHallModel: ObservableObject {
     @Published private(set) var selectedIndex = 0
     @Published private(set) var desc = ""
     @Published private(set) var loading = true
+    /// 切分类时的加载态（与首屏 loading 分开，避免卡片闪成错误态）。
+    @Published private(set) var tabLoading = false
     @Published private(set) var error: String?
     @Published private(set) var member: Member
     @Published var sheetTarget: MedalSheetTarget?
@@ -53,9 +55,7 @@ final class MedalsHallModel: ObservableObject {
         results.indices.contains(selectedIndex) ? results[selectedIndex] : results.first
     }
 
-    var medalTotal: Int { modules.flatMap(\.items).count }
-
-    var medalUnlocked: Int { modules.flatMap(\.items).filter { $0.unlocked }.count }
+    var medalUnlocked: Int { modules.flatMap(\.items).filter { $0.attained }.count }
 
     /// 没有任何勋章数据的模块直接不展示。
     var modules: [MedalModule] {
@@ -73,6 +73,7 @@ final class MedalsHallModel: ObservableObject {
         return artist.isEmpty ? "的勋章馆" : "\(artist)的勋章馆"
     }
 
+    /// 首屏只解析当前 Tab 的卡片数据，其余 Tab 等点到再拉（懒加载）。
     func load() async {
         loading = true
         error = nil
@@ -83,34 +84,22 @@ final class MedalsHallModel: ObservableObject {
             desc = page.desc
             results = page.results
             selectedIndex = page.initialTabIndex
-            loading = false
-            Task { await self.fillRemainingTabs() }
+            error = nil
         } catch {
             self.error = error.localizedDescription
-            loading = false
         }
-    }
-
-    private func fillRemainingTabs() async {
-        guard let page else { return }
-        await services.medals.ensureHallTabs(page) { [weak self] updated in
-            let snapshot = updated.results
-            Task { @MainActor in self?.apply(snapshot) }
-        }
-    }
-
-    private func apply(_ snapshot: [ModuleTabResult]) {
-        guard !snapshot.isEmpty else { return }
-        results = snapshot
+        loading = false
     }
 
     func select(_ index: Int) async {
         guard results.indices.contains(index) else { return }
         selectedIndex = index
-        if results[index].success || results[index].loading { return }
+        if results[index].success { return }
         guard let page else { return }
+        tabLoading = true
+        defer { tabLoading = false }
         _ = await services.medals.hallTab(page, index: index)
-        apply(page.results)
+        results = page.results
     }
 
     // MARK: - 勋章点击
@@ -148,6 +137,10 @@ struct MedalsHallView: View {
         _model = StateObject(wrappedValue: MedalsHallModel(memberId: memberId))
     }
 
+    private var showsPlaceholders: Bool {
+        model.loading || model.tabLoading
+    }
+
     var body: some View {
         DetailPageScaffold(
             header: MemberSectionHeader(
@@ -165,13 +158,12 @@ struct MedalsHallView: View {
                     errorIndexes: model.errorIndexes,
                     onSelect: { index in Task { await model.select(index) } }
                 )
-                .padding(.horizontal, 16)
             }
 
-            if model.loading {
+            if showsPlaceholders {
                 // 加载中也用同一套卡片 UI，只是喂占位项。
-                ForEach(0..<2, id: \.self) { _ in
-                    placeholderCard
+                ForEach(0..<2, id: \.self) { index in
+                    placeholderCard(ns: index)
                 }
             } else {
                 ForEach(Array(model.modules.enumerated()), id: \.offset) { _, module in
@@ -179,19 +171,20 @@ struct MedalsHallView: View {
                 }
             }
 
-            if let error = model.error {
-                StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
-                    Task { await model.load() }
-                }
-                .padding(.horizontal, 16)
-            } else if !model.loading, let current = model.current, !current.success {
-                StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
-                    Task { await model.load() }
-                }
-                .padding(.horizontal, 16)
-            } else if !model.loading, model.modules.isEmpty {
-                StateNotice(title: "暂无奖章数据")
-                    .padding(.horizontal, 16)
+            if let error = model.error, !showsPlaceholders {
+                DetailPageNotice(
+                    StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
+                        Task { await model.load() }
+                    }
+                )
+            } else if !showsPlaceholders, let current = model.current, !current.success {
+                DetailPageNotice(
+                    StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
+                        Task { await model.select(model.selectedIndex) }
+                    }
+                )
+            } else if !showsPlaceholders, model.modules.isEmpty {
+                DetailPageNotice(StateNotice(title: "暂无奖章数据"))
             }
         }
         .navigationTitle("已获得奖章")
@@ -212,9 +205,9 @@ struct MedalsHallView: View {
     }
 
     /// 加载中的占位卡：与真实卡完全同一套组件，只是数据为空。
-    private var placeholderCard: some View {
+    private func placeholderCard(ns: Int) -> some View {
         DetailSeriesCard(title: "") {
-            ZoomedMedalTileGrid(items: Self.placeholderItems(ns: 0), zoomNamespace: nil) { _ in }
+            ZoomedMedalTileGrid(items: Self.placeholderItems(ns: ns), zoomNamespace: nil) { _ in }
         }
     }
 
