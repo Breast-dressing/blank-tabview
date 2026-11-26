@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// 详情弹窗统一尺寸：皮肤详情与奖章详情共用同一套数值。
-/// 54（工具栏）+ 280（图片）+ 8（间距）+ 40（底部行）+ 16（底边距）。
 enum DetailSheetMetrics {
-    static let height: CGFloat = 400
+    /// 弹窗总高：工具栏 67 + 图片 280 + 间距 8 + 底部行 45 + 底边距 16。
+    static let height: CGFloat = 412
     static let mediaHeight: CGFloat = 280
     static let cornerRadius: CGFloat = 28
     static let leadingInset: CGFloat = 20
@@ -66,19 +66,20 @@ struct DetailSheetContent<Media: View>: View {
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.capsule)
-                    .frame(height: rowHeight > 0 ? rowHeight : 44)
+                    .frame(height: rowHeight > 0 ? rowHeight : 45)
                 }
             }
             .padding(.leading, DetailSheetMetrics.leadingInset)
             .padding(.trailing, DetailSheetMetrics.edgeInset)
             .padding(.bottom, DetailSheetMetrics.edgeInset)
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 
-/// 弹窗里的等比媒体图：高度恒等于设定高度，宽度按比例铺满后裁切。
+/// 弹窗里的媒体图：保持原尺寸比例居中，最多顶到 280 高，绝不裁切（高图等比缩到 280）。
 struct DetailSheetImage: View {
     let image: UIImage?
 
@@ -87,12 +88,11 @@ struct DetailSheetImage: View {
             if let image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             } else {
                 ProgressView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
     }
 }
