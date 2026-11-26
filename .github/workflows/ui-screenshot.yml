@@ -75,6 +75,16 @@ jobs:
           sleep 9
           xcrun simctl io booted screenshot "build/shot-medalsheet.png"
           echo "shot medal sheet done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoMedals 2>&1 | tee build/launch-medals.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-medals.png"
+          echo "shot medals hall done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoRank 2>&1 | tee build/launch-rank.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-rank.png"
+          echo "shot rank done"
 
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true

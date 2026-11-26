@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct RootTabView: View {
     @State private var selection: AppTab = AppTab.launchTab
@@ -51,6 +50,18 @@ struct RootTabView: View {
                     seriesName: "系列 1",
                     skins: Array(SkinsModel.demoSkins.prefix(3))
                 )
+            }
+        }
+        // 仅用于 CI 截图核对：-demoMedals 时直接展示「已获得奖章」页。
+        .fullScreenCover(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoMedals"))) {
+            NavigationStack {
+                MedalsHallView(memberId: "demo")
+            }
+        }
+        // 仅用于 CI 截图核对：-demoRank 时直接展示周榜详情页。
+        .fullScreenCover(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoRank"))) {
+            NavigationStack {
+                RankDetailView(memberId: "demo", scheme: "", title: "周榜", tabName: "周榜")
             }
         }
         // 仅用于 CI 截图核对：-demoMedalSheet 时直接弹出分级勋章弹窗（可左右滑动）。
@@ -116,8 +127,4 @@ struct RootTabView: View {
             ctx.fill(CGRect(x: 80, y: 300, width: 640, height: 200))
         }
     }()
-}
-
-#Preview {
-    RootTabView()
 }
