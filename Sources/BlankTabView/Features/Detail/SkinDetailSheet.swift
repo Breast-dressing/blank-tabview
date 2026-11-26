@@ -125,7 +125,11 @@ struct SkinDetailSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .task(id: skin.pic) {
-            image = localImage ?? (await RemoteImageLoader.image(for: skin.pic))
+            if let localImage {
+                image = localImage
+            } else {
+                image = await RemoteImageLoader.image(for: skin.pic)
+            }
         }
     }
 }
