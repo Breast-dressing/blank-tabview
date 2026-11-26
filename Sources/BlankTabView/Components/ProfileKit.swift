@@ -58,6 +58,9 @@ struct PillTabsView: View {
             }
             .padding(.horizontal, 1)
         }
+        // 滚动区铺满整行、内容两侧各留 16：胶囊滚动时在屏幕边缘才裁切，而不是在 16pt 处被裁掉。
+        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -113,7 +116,7 @@ struct MedalTileCell: View {
                     AsyncImage(url: url) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFit()
-                                .opacity(item.unlocked ? 1 : 0.55)
+                                .opacity(item.attained ? 1 : 0.55)
                         } else {
                             ProgressView()
                         }
@@ -122,7 +125,7 @@ struct MedalTileCell: View {
                 } else {
                     placeholder
                 }
-                if !item.unlocked {
+                if !item.attained {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.black.opacity(0.32))
                     Image(systemName: "lock.fill")
