@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 详情弹窗统一尺寸：皮肤详情与奖章详情共用同一套数值。
 enum DetailSheetMetrics {
-    /// 弹窗总高：工具栏 67 + 图片 280 + 间距 8 + 底部行 45 + 底边距 16。
+    /// 弹窗总高：工具栏 + 图片 280 + 间距 8 + 底部行 + 底边距 16。
     static let height: CGFloat = 412
     static let mediaHeight: CGFloat = 280
     static let cornerRadius: CGFloat = 28
@@ -66,20 +66,19 @@ struct DetailSheetContent<Media: View>: View {
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.capsule)
-                    .frame(height: rowHeight > 0 ? rowHeight : 45)
+                    .frame(height: max(44, rowHeight))
                 }
             }
             .padding(.leading, DetailSheetMetrics.leadingInset)
             .padding(.trailing, DetailSheetMetrics.edgeInset)
             .padding(.bottom, DetailSheetMetrics.edgeInset)
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
-            .fixedSize(horizontal: false, vertical: true)
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 
-/// 弹窗里的媒体图：保持原尺寸比例居中，最多顶到 280 高，绝不裁切（高图等比缩到 280）。
+/// 弹窗里的媒体图：保持原比例居中，最高顶到 280，绝不裁切（高图等比缩到 280）。
 struct DetailSheetImage: View {
     let image: UIImage?
 
