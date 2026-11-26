@@ -235,7 +235,7 @@ final class QqApi: @unchecked Sendable {
         do {
             let req = try await cgi(
                 "GetHomepageTabDetail",
-                ["EncUin": encUin, "TabID": tab.id, "IsQueryTabDetail": true, "SupportCardType": true, "SupportCardStyle": true],
+                ["EncUin": encUin, "TabID": tab.id, "IsQueryTabDetail": true, "SupportCardStyle": true],
                 "music.medalHall.MedalHallHomepageSrv",
                 "GetHomepageTabDetail"
             )
