@@ -25,26 +25,12 @@ final class RankDetailModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
-    static let demoMembers: [RankMember] = (1...10).map { position in
-        var item = RankMember()
-        item.position = position
-        item.title = "乐迷用户 \(position)"
-        item.wearTexts = position <= 3 ? ["铁粉"] : []
-        item.descTexts = ["贡献值 \(1000 - position * 60)"]
-        item.praiseNum = 1200 - position * 45
-        return item
-    }
-
     /// 只展示进入时点的那个榜：页面里不再有分类切换。
     func load() async {
         loading = true
         error = nil
         // 仅 CI 截图核对：-demoRank 直接喂演示数据。
         if ProcessInfo.processInfo.arguments.contains("-demoRank") {
-            var member = self.member
-            member.artistName = "虞书欣"
-            member.title = "星欣🎀"
-            self.member = member
             tab = MedalTab(name: "周榜", type: 1, id: 1)
             detail = RankDetail(items: Self.demoMembers)
             loading = false
@@ -64,6 +50,8 @@ final class RankDetailModel: ObservableObject {
                     index = exact
                 } else if let partial = page.tabs.firstIndex(where: { $0.name.contains(wantedTab) }) {
                     index = partial
+                } else if page.tabs.count > 1 {
+                    index = min(index, page.tabs.count - 1)
                 }
             }
             index = min(max(index, 0), page.tabs.count - 1)
@@ -81,6 +69,16 @@ final class RankDetailModel: ObservableObject {
         }
         loading = false
     }
+
+    static let demoMembers: [RankMember] = (1...10).map { position in
+        var item = RankMember()
+        item.position = position
+        item.title = "乐迷用户 \(position)"
+        item.wearTexts = position <= 3 ? ["铁粉"] : []
+        item.descTexts = ["贡献值 \(1000 - position * 60)"]
+        item.praiseNum = 1200 - position * 45
+        return item
+    }
 }
 
 // MARK: - View
@@ -88,6 +86,8 @@ final class RankDetailModel: ObservableObject {
 /// 排行榜详情：与「乐迷皮肤」页同一套骨架（成员信息平铺 + 白卡片），页面内不再放分类胶囊。
 struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
+    /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
+    @State private var openedMember: Member?
 
     init(memberId: String, scheme: String, title: String, tabName: String) {
         _model = StateObject(
@@ -133,6 +133,8 @@ struct RankDetailView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
                             RankMemberRow(item: item)
+                                .contentShape(Rectangle())
+                                .onTapGesture { openedMember = seedMember(for: item) }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,14 +143,28 @@ struct RankDetailView: View {
                 DetailPageNotice(StateNotice(title: "暂无数据", message: model.detail?.emptyText))
             }
         }
+        .navigationDestination(item: $openedMember) { member in
+            MedalsHallView(memberId: member.itemId, seedMember: member)
+        }
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
     }
+
+    /// 用榜行数据做成员卡片入参，避免陌生成员落到「用户」占位。
+    private func seedMember(for item: RankMember) -> Member? {
+        let id = item.itemId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return nil }
+        var member = AppServices.shared.member(id)
+        if member.title.isEmpty || member.title == "用户" {
+            member = Member(itemId: id, title: item.title, pic: item.pic)
+        }
+        return member
+    }
 }
 
-/// 榜单行：名次 + 头像 + 名字/铭牌 + 心动数。
+/// 榜单行：名次 + 头像 + 名字/勋章铭牌 + 心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -172,7 +188,8 @@ struct RankMemberRow: View {
                        MemberId.matches(item.itemId, selected) {
                         MeBadge()
                     }
-                    if let wear = item.wearTexts.first, !wear.isEmpty {
+                    // 与 node renderRankItem 一致：WearList 有几段就显示几枚铭牌。
+                    ForEach(item.wearTexts.filter { !$0.isEmpty }, id: \.self) { wear in
                         Plate(text: wear, filled: true)
                     }
                 }

@@ -38,7 +38,7 @@ final class MedalsHallModel: ObservableObject {
     @Published private(set) var selectedIndex = 0
     @Published private(set) var desc = ""
     @Published private(set) var loading = true
-    /// 切分类时的加载态（与首屏 loading 分开，避免卡片闪成错误态）。
+    /// 切换分类时的加载态（与首屏 loading 分开，避免卡片闪成错误态）。
     @Published private(set) var tabLoading = false
     @Published private(set) var error: String?
     @Published private(set) var member: Member
@@ -46,9 +46,9 @@ final class MedalsHallModel: ObservableObject {
 
     private var page: MedalHallPage?
 
-    init(memberId: String) {
+    init(memberId: String, seedMember: Member? = nil) {
         self.memberId = memberId
-        self.member = AppServices.shared.member(memberId)
+        self.member = seedMember ?? AppServices.shared.member(memberId)
     }
 
     var current: ModuleTabResult? {
@@ -95,16 +95,12 @@ final class MedalsHallModel: ObservableObject {
         return artist.isEmpty ? "的勋章馆" : "\(artist)的勋章馆"
     }
 
-    /// 首屏只解析当前 Tab 的卡片数据，其余 Tab 等点到再拉（懒加载）。
+    /// 首屏只解析当前 Tab 的卡片数据（其余 Tab 等点到再拉）。
     func load() async {
         loading = true
         error = nil
         // 仅 CI 截图核对：-demoMedals 直接喂演示数据。
         if ProcessInfo.processInfo.arguments.contains("-demoMedals") {
-            var member = self.member
-            member.artistName = "虞书欣"
-            member.title = "星欣🎀"
-            self.member = member
             tabs = Self.demoTabs
             results = [ModuleTabResult(tab: Self.demoTabs[0], success: true, modules: Self.demoModules)]
             selectedIndex = 0
@@ -167,8 +163,8 @@ struct MedalsHallView: View {
     @State private var pendingPush: ProfileDestination?
     @Namespace private var zoomNS
 
-    init(memberId: String) {
-        _model = StateObject(wrappedValue: MedalsHallModel(memberId: memberId))
+    init(memberId: String, seedMember: Member? = nil) {
+        _model = StateObject(wrappedValue: MedalsHallModel(memberId: memberId, seedMember: seedMember))
     }
 
     private var showsPlaceholders: Bool {
