@@ -94,7 +94,8 @@ final class MedalModuleModel: ObservableObject {
             scheme: item.scheme,
             imageUrl: item.picUrl,
             date: item.createTime.isEmpty ? item.cornerTitle : item.createTime,
-            number: item.numberText
+            number: MedalSheetTarget.numberText(of: item),
+            cornerTitle: item.cornerTitle
         )
         return nil
     }

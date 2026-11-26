@@ -8,10 +8,21 @@ struct MedalSheetTarget: Identifiable {
     let scheme: String
     let imageUrl: String
     let date: String
-    /// 限定编号（接口 NumberInfo / Corner 里的 NO.x）。
+    /// 限定编号（接口 NumberInfo.Content，降级读 Corner.Title）。
     var number: String = ""
+    /// Corner.Title：可能承载「NO.xxx」也可能承载日期。
+    var cornerTitle: String = ""
 
     var id: String { medalId + "|" + imageUrl }
+
+    /// 编号优先取 NumberInfo，其次取 Corner.Title 里的 NO.x。
+    static func numberText(of item: MedalItem) -> String {
+        let number = item.numberText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !number.isEmpty && number != "NO.----" { return number }
+        let corner = item.cornerTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if corner.hasPrefix("NO.") { return corner }
+        return ""
+    }
 }
 
 // MARK: - Model
@@ -119,7 +130,8 @@ final class MedalsHallModel: ObservableObject {
             scheme: item.scheme,
             imageUrl: item.picUrl,
             date: item.createTime.isEmpty ? item.cornerTitle : item.createTime,
-            number: item.numberText
+            number: MedalSheetTarget.numberText(of: item),
+            cornerTitle: item.cornerTitle
         )
         return nil
     }

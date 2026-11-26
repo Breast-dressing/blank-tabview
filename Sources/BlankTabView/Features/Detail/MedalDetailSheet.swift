@@ -31,15 +31,21 @@ struct MedalDetailSheet: View {
         pages.indices.contains(index) ? pages[index] : pages[0]
     }
 
-    /// 限定编号：来自勋章卡数据里的 NumberInfo.Content（与 node 项目一致），只有当前分级对得上时用。
+    /// 限定编号：直接取点击那枚勋章卡里的 NumberInfo.Content（与 node 项目读同一字段）。
     private var numberText: String {
-        let id = current.medalId
-        if !id.isEmpty && id != target.medalId { return "" }
-        return target.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = target.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && trimmed != "NO.----" { return trimmed }
+        // 兜底：部分数据把编号塞在 Corner.Title。
+        let corner = target.cornerTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if corner.hasPrefix("NO.") { return corner }
+        return ""
     }
 
     private var dateText: String {
-        Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
+        let raw = current.createTime.isEmpty ? target.date : current.createTime
+        // 日期字段里误塞了编号时，不当日期用。
+        if raw.hasPrefix("NO.") { return "" }
+        return Fmt.compact(raw)
     }
 
     /// 没有限定编号时，获得时间顶到编号位。
