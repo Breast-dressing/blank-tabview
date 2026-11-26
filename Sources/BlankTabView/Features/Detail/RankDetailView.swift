@@ -25,10 +25,31 @@ final class RankDetailModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
+    static let demoMembers: [RankMember] = (1...10).map { position in
+        var item = RankMember()
+        item.position = position
+        item.title = "乐迷用户 \(position)"
+        item.wearTexts = position <= 3 ? ["铁粉"] : []
+        item.descTexts = ["贡献值 \(1000 - position * 60)"]
+        item.praiseNum = 1200 - position * 45
+        return item
+    }
+
     /// 只展示进入时点的那个榜：页面里不再有分类切换。
     func load() async {
         loading = true
         error = nil
+        // 仅 CI 截图核对：-demoRank 直接喂演示数据。
+        if ProcessInfo.processInfo.arguments.contains("-demoRank") {
+            var member = self.member
+            member.artistName = "虞书欣"
+            member.title = "星欣🎀"
+            self.member = member
+            tab = MedalTab(name: "周榜", type: 1, id: 1)
+            detail = RankDetail(items: Self.demoMembers)
+            loading = false
+            return
+        }
         do {
             let page = try await services.medals.rankPage(scheme, force: true)
             guard !page.tabs.isEmpty else {

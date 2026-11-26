@@ -63,6 +63,28 @@ final class MedalsHallModel: ObservableObject {
         return current.modules.filter { !$0.items.isEmpty }
     }
 
+    static let demoTabs: [MedalTab] = (0..<9).map { index in
+        MedalTab(name: "分类 \(index + 1)", type: index, id: index)
+    }
+
+    static let demoModules: [MedalModule] = (0..<3).map { index in
+        MedalModule(
+            moduleId: "demo-module-\(index)",
+            moduleName: "系列 \(index + 1)",
+            items: (0..<3).map { itemIndex in
+                var item = MedalItem()
+                item.medalId = "demo-\(index)-\(itemIndex)"
+                item.name = "\(index + 1)-\(itemIndex + 1) 十周年限定"
+                item.picUrl = ""
+                // 第一张单级已获得，第二张是分级勋章（只解锁一级），第三张未解锁。
+                item.level = itemIndex == 0 ? 3 : (itemIndex == 1 ? 1 : 0)
+                item.state = itemIndex == 0 ? 2 : 1
+                item.numberText = itemIndex == 1 ? "NO.0025" : ""
+                return item
+            }
+        )
+    }
+
     var errorIndexes: Set<Int> {
         Set(results.indices.filter { !results[$0].success && !results[$0].loading })
     }
@@ -77,6 +99,18 @@ final class MedalsHallModel: ObservableObject {
     func load() async {
         loading = true
         error = nil
+        // 仅 CI 截图核对：-demoMedals 直接喂演示数据。
+        if ProcessInfo.processInfo.arguments.contains("-demoMedals") {
+            var member = self.member
+            member.artistName = "虞书欣"
+            member.title = "星欣🎀"
+            self.member = member
+            tabs = Self.demoTabs
+            results = [ModuleTabResult(tab: Self.demoTabs[0], success: true, modules: Self.demoModules)]
+            selectedIndex = 0
+            loading = false
+            return
+        }
         do {
             let page = try await services.medals.hallPage(services.hallURL(memberId), onlyInitial: true)
             self.page = page
