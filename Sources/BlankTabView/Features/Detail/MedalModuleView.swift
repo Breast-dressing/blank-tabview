@@ -30,6 +30,15 @@ final class MedalModuleModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
+    var unlockedCount: Int { items.filter { $0.unlocked }.count }
+
+    /// 成员信息下方文案：「的 + 系列名」。
+    var headerSubtitle: String {
+        let artist = member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let series = moduleName.isEmpty ? "勋章馆" : moduleName
+        return artist.isEmpty ? "的\(series)" : "\(artist)的\(series)"
+    }
+
     func load() async {
         loading = true
         error = nil
@@ -108,49 +117,34 @@ struct MedalModuleView: View {
         )
     }
 
-    private var unlockedCount: Int { model.items.filter { $0.unlocked }.count }
-
-    private var headerSubtitle: String {
-        let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = model.moduleName.isEmpty ? "勋章馆" : model.moduleName
-        return artist.isEmpty ? base : "\(artist)的\(base)"
-    }
-
     var body: some View {
-        List {
-            // 成员信息：与乐迷皮肤页同一套透明容器，左右与卡片边缘对齐。
-            Section {
-                MemberSectionHeader(
-                    title: model.member.title,
-                    pic: model.member.pic,
-                    subtitle: headerSubtitle,
-                    count: "\(unlockedCount)",
-                    unit: "枚"
-                )
-                .memberInfoRow()
-            }
-            .listSectionSpacing(.custom(0))
-
+        DetailPageScaffold(
+            header: MemberSectionHeader(
+                title: model.member.title,
+                pic: model.member.pic,
+                subtitle: model.headerSubtitle,
+                count: "\(model.unlockedCount)",
+                unit: "枚"
+            )
+        ) {
             if model.loading {
                 StateNotice(title: "正在读取模块…", progress: true)
-                    .listRowBackground(Color.clear)
+                    .padding(.horizontal, 16)
             } else if let error = model.error {
                 StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
-                .listRowBackground(Color.clear)
+                .padding(.horizontal, 16)
             } else if model.items.isEmpty {
                 StateNotice(title: "这个模块还没有勋章")
-                    .listRowBackground(Color.clear)
+                    .padding(.horizontal, 16)
             } else {
-                Section {
+                DetailSeriesCard(title: model.moduleName.isEmpty ? "全部" : model.moduleName) {
                     ZoomedMedalTileGrid(items: model.items, zoomNamespace: zoomNS) { item in
                         if let route = model.openTile(item) {
                             pendingPush = route
                         }
                     }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
 
                     if model.hasNext {
                         Button {
@@ -169,8 +163,6 @@ struct MedalModuleView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }

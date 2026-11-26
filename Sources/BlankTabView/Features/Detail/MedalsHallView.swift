@@ -48,6 +48,12 @@ final class MedalsHallModel: ObservableObject {
         Set(results.indices.filter { !results[$0].success && !results[$0].loading })
     }
 
+    /// 成员信息下方的文案：固定为「的勋章馆」。
+    var headerSubtitle: String {
+        let artist = member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return artist.isEmpty ? "的勋章馆" : "\(artist)的勋章馆"
+    }
+
     func load() async {
         loading = true
         error = nil
@@ -122,57 +128,47 @@ struct MedalsHallView: View {
     }
 
     var body: some View {
-        List {
-            // 成员信息：与乐迷皮肤页同一套透明容器，左右与卡片边缘对齐。
-            Section {
-                MemberSectionHeader(
-                    title: model.member.title,
-                    pic: model.member.pic,
-                    subtitle: model.desc.isEmpty ? "已获得奖章" : model.desc,
-                    count: "\(model.medalUnlocked)",
-                    unit: "枚"
-                )
-                .memberInfoRow()
-            }
-            .listSectionSpacing(.custom(0))
-
+        DetailPageScaffold(
+            header: MemberSectionHeader(
+                title: model.member.title,
+                pic: model.member.pic,
+                subtitle: model.headerSubtitle,
+                count: "\(model.medalUnlocked)",
+                unit: "枚"
+            )
+        ) {
             if model.tabs.count > 1 {
-                Section {
-                    PillTabsView(
-                        titles: model.tabs.map { Fmt.cleanTabName($0.name) },
-                        selected: model.selectedIndex,
-                        errorIndexes: model.errorIndexes,
-                        onSelect: { index in Task { await model.select(index) } }
-                    )
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(RoundedRectangle(cornerRadius: 0, style: .continuous).fill(Color.clear))
-                }
+                PillTabsView(
+                    titles: model.tabs.map { Fmt.cleanTabName($0.name) },
+                    selected: model.selectedIndex,
+                    errorIndexes: model.errorIndexes,
+                    onSelect: { index in Task { await model.select(index) } }
+                )
+                .padding(.horizontal, 16)
             }
 
             ForEach(Array(moduleSections.enumerated()), id: \.offset) { _, pair in
-                moduleSection(pair.module, tabName: pair.tabName)
+                moduleCard(pair.module, tabName: pair.tabName)
             }
 
             if model.loading {
                 StateNotice(title: "正在读取勋章数据…", progress: true)
-                    .listRowBackground(Color.clear)
+                    .padding(.horizontal, 16)
             } else if let error = model.error {
                 StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
-                .listRowBackground(Color.clear)
+                .padding(.horizontal, 16)
             } else if let current = model.current, !current.success {
                 StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
-                .listRowBackground(Color.clear)
+                .padding(.horizontal, 16)
             } else if moduleSections.isEmpty {
                 StateNotice(title: "暂无奖章数据")
-                    .listRowBackground(Color.clear)
+                    .padding(.horizontal, 16)
             }
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
         .navigationTitle("已获得奖章")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -195,40 +191,25 @@ struct MedalsHallView: View {
         return current.modules.map { ($0, current.tab.name) }
     }
 
-    private func moduleSection(_ module: MedalModule, tabName: String) -> some View {
-        Section {
-            HStack(spacing: 8) {
-                Text(module.moduleName.isEmpty ? "模块 \(module.moduleId)" : module.moduleName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if !module.moduleId.isEmpty {
-                    Button {
-                        pendingPush = .medalModule(
-                            memberId: model.memberId,
-                            moduleId: module.moduleId,
-                            moduleName: module.moduleName,
-                            tabName: tabName
-                        )
-                    } label: {
-                        HStack(spacing: 2) {
-                            Text("全部").font(.system(size: 12))
-                            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
+    /// 卡片：与乐迷皮肤页的系列卡同一套（标题 + 「全部」+ 三列奖章）。
+    private func moduleCard(_ module: MedalModule, tabName: String) -> some View {
+        DetailSeriesCard(
+            title: module.moduleName.isEmpty ? "模块 \(module.moduleId)" : module.moduleName,
+            trailing: module.moduleId.isEmpty ? nil : "全部",
+            onTrailingTap: module.moduleId.isEmpty ? nil : {
+                pendingPush = .medalModule(
+                    memberId: model.memberId,
+                    moduleId: module.moduleId,
+                    moduleName: module.moduleName,
+                    tabName: tabName
+                )
             }
-            .listRowSeparator(.hidden)
-
+        ) {
             ZoomedMedalTileGrid(items: Array(module.items.prefix(3)), zoomNamespace: zoomNS) { item in
                 if let route = model.openTile(item, tabName: tabName) {
                     pendingPush = route
                 }
             }
-            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
-            .listRowSeparator(.hidden)
         }
     }
 

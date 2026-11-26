@@ -12,11 +12,8 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    @State private var imageHeight: CGFloat = 280
-
-    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 底部一行文本。
+    /// 固定高度 369：工具栏 + 图片 + 间距 + 底部一行文本与按钮。
     private static let baseHeight: CGFloat = 369
-    @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -49,10 +46,12 @@ struct SkinDetailSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 8) {
+                // 图片吃掉剩余高度，底部一行因此能稳定压在底部边距上。
                 imageView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // 左下两行文本（限定编号 / 获得时间 + 人数），右下「打开」玻璃按钮，与两行文本等高。
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(primaryText)
                             .font(.system(size: 19, weight: .bold))
@@ -80,8 +79,10 @@ struct SkinDetailSheet: View {
                     .frame(height: textHeight > 0 ? textHeight : 44)
                 }
             }
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // 左右与底边距跟工具栏按钮一致：左 20 / 右 16 / 底 16。
+            .padding(.leading, 20)
+            .padding(.trailing, 16)
+            .padding(.bottom, 16)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -99,8 +100,8 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 固定 369 高；材质与圆角都画在内容上，zoom 动画全过程不会露出直角。
-        .detailSheetChrome(height: sheetHeight)
+        // 高度恒为 369：不随图片比例变化，避免关掉再开时 detent 落回全屏。
+        .detailSheetChrome(height: Self.baseHeight)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
     }
 
@@ -120,25 +121,11 @@ struct SkinDetailSheet: View {
                 ProgressView()
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: imageHeight)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .task(id: skin.pic) {
-            let loaded: UIImage?
-            if let localImage {
-                loaded = localImage
-            } else {
-                loaded = await RemoteImageLoader.image(for: skin.pic)
-            }
-            image = loaded
-            if let image = loaded {
-                let maxWidth = UIScreen.main.bounds.width - 40
-                let ratio = image.size.height / max(1, image.size.width)
-                let height = min(280, maxWidth * ratio)
-                imageHeight = height
-                sheetHeight = SkinDetailSheet.baseHeight - (280 - height)
-            }
+            image = localImage ?? (await RemoteImageLoader.image(for: skin.pic))
         }
     }
 }
