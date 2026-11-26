@@ -32,13 +32,12 @@ struct MedalDetailSheet: View {
         pages.indices.contains(index) ? pages[index] : pages[0]
     }
 
-    /// 限定编号：接口 MedalList[*].NumberInfo.Content，其次列表卡带过来的编号。
+    /// 限量编号：只认 OldMedalDetail.MedalList[*].NumberInfo.Content；
+    /// 接口还没回来时先用列表卡带过来的同一个字段（demo 也走这条）。
     private var numberText: String {
         let fromDetail = numbers.number(for: current.medalId)
         if !fromDetail.isEmpty { return fromDetail }
-        let fromTarget = MedalDetailNumbers.clean(target.number)
-        if !fromTarget.isEmpty { return fromTarget }
-        return MedalDetailNumbers.clean(target.cornerTitle)
+        return MedalDetailNumbers.clean(target.number)
     }
 
     private var dateText: String {
