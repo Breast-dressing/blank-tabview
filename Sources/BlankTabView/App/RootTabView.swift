@@ -33,7 +33,7 @@ struct RootTabView: View {
                 localImage: Self.demoImage
             )
         }
-        // 仅用于 CI 截图核对：-demoSkinLocked 时弹出未解锁皮肤的弹窗（核对「去获取」按钮）。
+        // 仅用于 CI 截图核对：-demoSkinLocked 时弹出未解锁皮肤的弹窗。
         .sheet(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("-demoSkinLocked"))) {
             SkinDetailSheet(
                 skin: Self.demoSkinLocked,
@@ -69,7 +69,8 @@ struct RootTabView: View {
             medalName: "10日见习天使",
             scheme: "",
             imageUrl: "",
-            date: "2025-12-09"
+            date: "2025-12-09",
+            number: "NO.3"
         )
     }
 
@@ -78,6 +79,7 @@ struct RootTabView: View {
         item.level = level
         item.state = level <= 2 ? 2 : 0
         item.name = "\(level * 10)日见习天使"
+        item.medalId = "demo-medal"
         item.createTime = "2025-12-0\(level)"
         return item
     }
@@ -92,7 +94,7 @@ struct RootTabView: View {
         return skin
     }
 
-    /// 未解锁皮肤：用于核对弹窗里的「去获取」按钮。
+    /// 未解锁皮肤：用于核对弹窗里的「打开」按钮。
     private static var demoSkinLocked: SkinItem {
         var skin = SkinItem()
         skin.id = "demo-locked"

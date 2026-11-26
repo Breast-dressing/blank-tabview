@@ -176,8 +176,12 @@ struct SkinsView: View {
             )
         ) {
             if model.groups.isEmpty {
-                stateRow
-                    .padding(.horizontal, 16)
+                // 加载中 / 暂无数据都复用同一套卡片 UI，只喂占位项。
+                ForEach(0..<2, id: \.self) { index in
+                    DetailSeriesCard(title: "") {
+                        SkinTileGrid(items: Self.placeholderSkins(ns: index), zoomNamespace: nil) { _ in }
+                    }
+                }
             } else {
                 ForEach(model.groups) { group in
                     DetailSeriesCard(
@@ -191,11 +195,6 @@ struct SkinsView: View {
                             selectedSkin = skin
                         }
                     }
-                }
-
-                if model.scanning {
-                    scanningRow
-                        .padding(.horizontal, 16)
                 }
             }
         }
@@ -218,6 +217,14 @@ struct SkinsView: View {
                 uin: model.memberId,
                 zoomNamespace: zoomNS
             )
+        }
+    }
+
+    static func placeholderSkins(ns: Int) -> [SkinItem] {
+        (0..<3).map { index in
+            var skin = SkinItem()
+            skin.id = "placeholder-\(ns)-\(index)"
+            return skin
         }
     }
 
@@ -247,24 +254,6 @@ struct SkinsView: View {
             seriesName: group.name,
             skins: group.skins
         )
-    }
-
-    @ViewBuilder
-    private var stateRow: some View {
-        if model.scanning {
-            StateNotice(title: "正在深度扫描乐迷皮肤…", progress: true)
-        } else {
-            StateNotice(title: "未找到乐迷皮肤数据", message: model.error)
-        }
-    }
-
-    private var scanningRow: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-            Text("正在深度扫描乐迷皮肤…")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
