@@ -466,7 +466,15 @@ final class QqApi: @unchecked Sendable {
 
     private func parseRankMember(_ item: [String: Any], fallbackPosition: Int) -> RankMember {
         var wear: [String] = []
+        var level = ""
         for entry in Self.list(item["WearList"]) {
+            // 铭牌抬头里的 V 等级（「虞书欣V5」→「V5」），与家族成员口径一致。
+            if level.isEmpty {
+                let wearTitle = Self.str(entry["Title"])
+                if let range = wearTitle.range(of: "V\\d+", options: .regularExpression) {
+                    level = String(wearTitle[range])
+                }
+            }
             let contents = Self.list(Self.map(entry["Segment"])["Contents"])
                 .map { Self.str($0["Content"]) }
                 .filter { !$0.isEmpty }
@@ -492,6 +500,7 @@ final class QqApi: @unchecked Sendable {
             title: title,
             pic: pic,
             itemId: Self.str(item["ItemID"]),
+            levelText: level,
             wearTexts: wear,
             descTexts: desc,
             praiseNum: Self.int(item["PraiseNum"]),
