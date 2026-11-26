@@ -14,6 +14,8 @@ struct SkinDetailSheet: View {
 
     /// 固定高度 369：工具栏 + 图片 + 间距 + 底部一行文本与按钮。
     private static let baseHeight: CGFloat = 369
+    /// 底部与右侧边距：和工具栏玻璃按钮保持一致。
+    private static let edgeInset: CGFloat = 16
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
@@ -43,46 +45,52 @@ struct SkinDetailSheet: View {
         URL(string: link) ?? URL(string: "https://y.qq.com")!
     }
 
+    private var rowHeight: CGFloat { textHeight > 0 ? textHeight : 44 }
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 8) {
-                // 图片吃掉剩余高度，底部一行因此能稳定压在底部边距上。
-                imageView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            GeometryReader { proxy in
+                // 图片高度 = 可用高度 - 间距 8 - 底部行 - 底边距，避免溢出被裁到屏幕外。
+                let imageHeight = max(140, proxy.size.height - rowHeight - 8 - Self.edgeInset)
 
-                // 左下两行文本（限定编号 / 获得时间 + 人数），右下「打开」玻璃按钮，与两行文本等高。
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(primaryText)
-                            .font(.system(size: 19, weight: .bold))
-                            .lineLimit(1)
+                VStack(alignment: .leading, spacing: 8) {
+                    imageView
+                        .frame(width: proxy.size.width - 20 - Self.edgeInset, height: imageHeight)
 
-                        Text(secondaryText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(primaryText)
+                                .font(.system(size: 19, weight: .bold))
+                                .lineLimit(1)
+
+                            Text(secondaryText)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
+
+                        Spacer(minLength: 8)
+
+                        Button {
+                            openInQQMusic()
+                        } label: {
+                            Text("打开")
+                                .font(.system(size: 15, weight: .semibold))
+                                .padding(.horizontal, 14)
+                                .frame(maxHeight: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                        .frame(height: rowHeight)
                     }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
-
-                    Spacer(minLength: 8)
-
-                    Button {
-                        openInQQMusic()
-                    } label: {
-                        Text("打开")
-                            .font(.system(size: 15, weight: .semibold))
-                            .padding(.horizontal, 14)
-                            .frame(maxHeight: .infinity)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-                    .frame(height: textHeight > 0 ? textHeight : 44)
+                    .frame(width: proxy.size.width - 20 - Self.edgeInset, alignment: .leading)
                 }
+                .padding(.leading, 20)
+                .padding(.trailing, Self.edgeInset)
+                .padding(.bottom, Self.edgeInset)
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             }
-            // 左右与底边距跟工具栏按钮一致：左 20 / 右 16 / 底 16（底边向屏幕边缘量，不叠加安全区）。
-            .padding(.leading, 20)
-            .padding(.trailing, 16)
-            .padding(.bottom, 16)
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
