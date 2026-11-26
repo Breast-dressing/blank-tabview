@@ -59,7 +59,7 @@ final class SkinsModel: ObservableObject {
     }
 
     func load() async {
-        // 仅 CI 截图核对用：-demoSkins 直接喂演示数据，便于验证成员信息与第一张卡片的间距。
+        // 仅 CI 截图核对用：-demoSkins 直接喂演示数据。
         if ProcessInfo.processInfo.arguments.contains("-demoSkins") {
             skins = Self.demoSkins
             total = skins.count
@@ -164,42 +164,29 @@ struct SkinsView: View {
     }
 
     var body: some View {
-        List {
-            // 成员信息直接平铺：挂在第一个分区的 header 上，不再占用一个透明卡片行。
-            if model.groups.isEmpty {
-                Section {
-                    stateRow
-                } header: {
-                    headerRow
-                }
-            } else {
-                ForEach(Array(model.groups.enumerated()), id: \.element.id) { index, group in
-                    Section {
-                        seriesRow(group)
-                        SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
-                            selectedSeries = group.name
-                            selectedSkin = skin
-                        }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 14, trailing: 16))
-                        .listRowSeparator(.hidden)
-                    } header: {
-                        if index == 0 {
-                            headerRow
-                        }
-                    }
-                }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                // 成员信息直接平铺在页面里，左右与下方卡片边缘对齐（16pt）。
+                headerRow
 
-                if model.scanning {
-                    Section {
+                if model.groups.isEmpty {
+                    stateRow
+                        .padding(.horizontal, 16)
+                } else {
+                    ForEach(model.groups) { group in
+                        seriesCard(group)
+                    }
+
+                    if model.scanning {
                         scanningRow
+                            .padding(.horizontal, 16)
                     }
                 }
             }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(.compact)
-        // 成员信息紧贴工具栏：去掉列表默认的顶部内边距，样式不变。
-        .contentMargins(.top, 0, for: .scrollContent)
+        .scrollIndicators(.hidden)
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -222,7 +209,7 @@ struct SkinsView: View {
         }
     }
 
-    /// 成员信息：平铺的分区 header，左右与下方卡片边缘对齐。
+    /// 成员信息：平铺、左右与卡片边缘对齐。
     private var headerRow: some View {
         MemberSectionHeader(
             title: model.member.title,
@@ -231,10 +218,27 @@ struct SkinsView: View {
             count: "\(model.displayTotal)",
             unit: "款"
         )
-        .textCase(nil)
         .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
+    }
+
+    /// 一个系列的卡片：标题 + 三列皮肤，白底圆角与系统分组卡片一致。
+    private func seriesCard(_ group: SkinSeriesGroup) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            seriesRow(group)
+            SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
+                selectedSeries = group.name
+                selectedSkin = skin
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .padding(.horizontal, 16)
     }
 
     /// 系列标题行：系列名 + 已收集 x/y 箭头。
@@ -258,7 +262,6 @@ struct SkinsView: View {
             }
             .buttonStyle(.plain)
         }
-        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
@@ -284,10 +287,8 @@ struct SkinsView: View {
     private var stateRow: some View {
         if model.scanning {
             StateNotice(title: "正在深度扫描乐迷皮肤…", progress: true)
-                .listRowBackground(Color.clear)
         } else {
             StateNotice(title: "未找到乐迷皮肤数据", message: model.error)
-                .listRowBackground(Color.clear)
         }
     }
 
@@ -298,7 +299,6 @@ struct SkinsView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
-        .listRowBackground(Color.clear)
     }
 }
 
