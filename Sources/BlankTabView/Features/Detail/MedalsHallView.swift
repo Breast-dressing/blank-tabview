@@ -8,6 +8,8 @@ struct MedalSheetTarget: Identifiable {
     let scheme: String
     let imageUrl: String
     let date: String
+    /// 限定编号（接口 NumberInfo / Corner 里的 NO.x）。
+    var number: String = ""
 
     var id: String { medalId + "|" + imageUrl }
 }
@@ -40,9 +42,15 @@ final class MedalsHallModel: ObservableObject {
         results.indices.contains(selectedIndex) ? results[selectedIndex] : results.first
     }
 
-    var medalTotal: Int { current?.modules.flatMap(\.items).count ?? 0 }
+    var medalTotal: Int { modules.flatMap(\.items).count }
 
-    var medalUnlocked: Int { current?.modules.flatMap(\.items).filter { $0.unlocked }.count ?? 0 }
+    var medalUnlocked: Int { modules.flatMap(\.items).filter { $0.unlocked }.count }
+
+    /// 没有任何勋章数据的模块直接不展示。
+    var modules: [MedalModule] {
+        guard let current, current.success else { return [] }
+        return current.modules.filter { !$0.items.isEmpty }
+    }
 
     var errorIndexes: Set<Int> {
         Set(results.indices.filter { !results[$0].success && !results[$0].loading })
@@ -110,7 +118,8 @@ final class MedalsHallModel: ObservableObject {
             medalName: item.name,
             scheme: item.scheme,
             imageUrl: item.picUrl,
-            date: item.createTime.isEmpty ? item.cornerTitle : item.createTime
+            date: item.createTime.isEmpty ? item.cornerTitle : item.createTime,
+            number: item.numberText
         )
         return nil
     }
@@ -147,24 +156,28 @@ struct MedalsHallView: View {
                 .padding(.horizontal, 16)
             }
 
-            ForEach(Array(moduleSections.enumerated()), id: \.offset) { _, pair in
-                moduleCard(pair.module, tabName: pair.tabName)
+            if model.loading {
+                // 加载中也用同一套卡片 UI，只是喂占位项。
+                ForEach(0..<2, id: \.self) { _ in
+                    placeholderCard
+                }
+            } else {
+                ForEach(Array(model.modules.enumerated()), id: \.offset) { _, module in
+                    moduleCard(module, tabName: model.current?.tab.name ?? "")
+                }
             }
 
-            if model.loading {
-                StateNotice(title: "正在读取勋章数据…", progress: true)
-                    .padding(.horizontal, 16)
-            } else if let error = model.error {
+            if let error = model.error {
                 StateNotice(title: "勋章数据加载失败", message: error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
                 .padding(.horizontal, 16)
-            } else if let current = model.current, !current.success {
+            } else if !model.loading, let current = model.current, !current.success {
                 StateNotice(title: "该分类加载失败", message: current.error, actionTitle: "重试") {
                     Task { await model.load() }
                 }
                 .padding(.horizontal, 16)
-            } else if moduleSections.isEmpty {
+            } else if !model.loading, model.modules.isEmpty {
                 StateNotice(title: "暂无奖章数据")
                     .padding(.horizontal, 16)
             }
@@ -186,9 +199,19 @@ struct MedalsHallView: View {
         }
     }
 
-    private var moduleSections: [(module: MedalModule, tabName: String)] {
-        guard let current = model.current, current.success else { return [] }
-        return current.modules.map { ($0, current.tab.name) }
+    /// 加载中的占位卡：与真实卡完全同一套组件，只是数据为空。
+    private var placeholderCard: some View {
+        DetailSeriesCard(title: "") {
+            ZoomedMedalTileGrid(items: Self.placeholderItems(ns: 0), zoomNamespace: nil) { _ in }
+        }
+    }
+
+    static func placeholderItems(ns: Int) -> [MedalItem] {
+        (0..<3).map { index in
+            var item = MedalItem()
+            item.medalId = "placeholder-\(ns)-\(index)"
+            return item
+        }
     }
 
     /// 卡片：与乐迷皮肤页的系列卡同一套（标题 + 「全部」+ 三列奖章）。

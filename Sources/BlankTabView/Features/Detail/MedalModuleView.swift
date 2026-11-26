@@ -93,7 +93,8 @@ final class MedalModuleModel: ObservableObject {
             medalName: item.name,
             scheme: item.scheme,
             imageUrl: item.picUrl,
-            date: item.createTime.isEmpty ? item.cornerTitle : item.createTime
+            date: item.createTime.isEmpty ? item.cornerTitle : item.createTime,
+            number: item.numberText
         )
         return nil
     }
@@ -128,13 +129,10 @@ struct MedalModuleView: View {
             )
         ) {
             if model.loading {
-                StateNotice(title: "正在读取模块…", progress: true)
-                    .padding(.horizontal, 16)
-            } else if let error = model.error {
-                StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
-                    Task { await model.load() }
+                // 加载中复用同一套卡片 UI，只是喂占位项。
+                DetailSeriesCard(title: "") {
+                    ZoomedMedalTileGrid(items: MedalsHallView.placeholderItems(ns: 1), zoomNamespace: nil) { _ in }
                 }
-                .padding(.horizontal, 16)
             } else if model.items.isEmpty {
                 StateNotice(title: "这个模块还没有勋章")
                     .padding(.horizontal, 16)
@@ -161,6 +159,13 @@ struct MedalModuleView: View {
                         .disabled(model.loadingMore)
                     }
                 }
+            }
+
+            if let error = model.error {
+                StateNotice(title: "模块加载失败", message: error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+                .padding(.horizontal, 16)
             }
         }
         .navigationTitle(model.moduleName.isEmpty ? "模块详情" : model.moduleName)
