@@ -14,18 +14,32 @@ struct SkinDetailSheet: View {
 
     @State private var imageHeight: CGFloat = 280
 
-    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 文本。
+    /// 固定高度 369：工具栏 + 图片 280 + 间距 8 + 底部一行文本。
     private static let baseHeight: CGFloat = 369
     @State private var sheetHeight: CGFloat = SkinDetailSheet.baseHeight
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
+    /// 左侧两行文本的实际高度，用来让「打开」按钮等高。
+    @State private var textHeight: CGFloat = 0
 
     private var link: String {
         let safeId = skin.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? skin.id
         let safeUin = uin.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uin
         return "https://i2.y.qq.com/n3/medal_collection/pages/medal_collection_v3/skin_detail.html"
             + "?_hidehd=1&_fontscale=1&skin_id=\(safeId)&enc_uin=\(safeUin)"
+    }
+
+    /// 没有限定编号时，把获得时间放到编号的位置。
+    private var primaryText: String {
+        if !skin.seqNo.isEmpty { return skin.seqNo }
+        return skin.unlockedDate.isEmpty ? "-" : skin.unlockedDate
+    }
+
+    private var secondaryText: String {
+        let count = skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得"
+        if skin.seqNo.isEmpty { return count }
+        return skin.unlockedDate.isEmpty ? count : "\(skin.unlockedDate)  \(count)"
     }
 
     private var shareURL: URL {
@@ -37,32 +51,33 @@ struct SkinDetailSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 imageView
 
-                if skin.isUnlocked {
+                // 左下两行文本（限定编号 / 获得时间 + 人数），右下「打开」玻璃按钮，与两行文本等高。
+                HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(skin.seqNo.isEmpty ? "-" : skin.seqNo)
+                        Text(primaryText)
                             .font(.system(size: 19, weight: .bold))
+                            .lineLimit(1)
 
-                        HStack(spacing: 8) {
-                            if !skin.unlockedDate.isEmpty {
-                                Text(skin.unlockedDate)
-                            }
-                            Text(skin.userCount > 0 ? "\(Fmt.thousands(skin.userCount)) 人已获得" : "- 人已获得")
-                        }
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        Text(secondaryText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                } else {
-                    // 未解锁：编号 / 日期 / 人数位置换成「去获取」，直接用系统的液态玻璃按钮。
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
+
+                    Spacer(minLength: 8)
+
                     Button {
                         openInQQMusic()
                     } label: {
-                        Text("去获取")
+                        Text("打开")
                             .font(.system(size: 15, weight: .semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 14)
+                            .frame(maxHeight: .infinity)
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.capsule)
+                    .frame(height: textHeight > 0 ? textHeight : 44)
                 }
             }
             .padding(.horizontal, 20)
