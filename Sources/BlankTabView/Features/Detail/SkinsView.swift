@@ -187,6 +187,8 @@ struct SkinsView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        // 页面底色用分组灰，白底卡片才有层次（与分组列表页一致）。
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
