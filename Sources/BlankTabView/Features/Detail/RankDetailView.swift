@@ -74,8 +74,8 @@ final class RankDetailModel: ObservableObject {
         var item = RankMember()
         item.position = position
         item.title = "乐迷用户 \(position)"
+        item.levelText = "V\(7 - min(position, 6))"
         item.wearTexts = position <= 3 ? ["铁粉"] : []
-        item.descTexts = ["贡献值 \(1000 - position * 60)"]
         item.praiseNum = 1200 - position * 45
         return item
     }
@@ -83,7 +83,9 @@ final class RankDetailModel: ObservableObject {
 
 // MARK: - View
 
-/// 排行榜详情：与「乐迷皮肤」页同一套骨架（成员信息平铺 + 白卡片），页面内不再放分类胶囊。
+/// 榜单详情：用系统电话「最近通话」式的 List 行（原生 List，不画卡片）；
+/// 成员信息同样是 List 里的首行。列表底色用 `.scrollContentBackground(.hidden)`
+/// 关掉系统白底，页面底色保持分组灰。
 struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
     /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
@@ -101,9 +103,12 @@ struct RankDetailView: View {
         return artist.isEmpty ? listName : "\(artist)的\(listName)"
     }
 
+    /// 「最近通话」行的内边距：左右与成员信息对齐。
+    private let rowInsets = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+
     var body: some View {
-        DetailPageScaffold(
-            header: MemberSectionHeader(
+        List {
+            MemberSectionHeader(
                 title: model.member.title,
                 pic: model.member.pic,
                 subtitle: headerSubtitle,
@@ -111,38 +116,22 @@ struct RankDetailView: View {
                 unit: "人",
                 label: "上榜"
             )
-        ) {
-            if model.loading {
-                // 加载中直接复用同一套行 UI，只是喂空数据。
-                DetailSeriesCard(title: model.title) {
-                    VStack(spacing: 0) {
-                        ForEach(0..<6, id: \.self) { _ in
-                            RankMemberRow(item: RankMember())
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else if let error = model.error {
-                DetailPageNotice(
-                    StateNotice(title: "榜单加载失败", message: error, actionTitle: "重试") {
-                        Task { await model.load() }
-                    }
-                )
-            } else if let detail = model.detail, !detail.items.isEmpty {
-                DetailSeriesCard(title: model.title) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
-                            RankMemberRow(item: item)
-                                .contentShape(Rectangle())
-                                .onTapGesture { openedMember = seedMember(for: item) }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else {
-                DetailPageNotice(StateNotice(title: "暂无数据", message: model.detail?.emptyText))
+            .listRowInsets(rowInsets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            Section {
+                rows
+            } header: {
+                Text(model.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .textCase(nil)
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationDestination(item: $openedMember) { member in
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
@@ -150,6 +139,40 @@ struct RankDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        if model.loading {
+            // 加载中也复用同一套行，只是喂空数据。
+            ForEach(0..<8, id: \.self) { _ in
+                RankMemberRow(item: RankMember())
+                    .listRowInsets(rowInsets)
+                    .listRowBackground(Color.clear)
+            }
+        } else if let error = model.error {
+            DetailPageNotice(
+                StateNotice(title: "榜单加载失败", message: error, actionTitle: "重试") {
+                    Task { await model.load() }
+                }
+            )
+            .listRowInsets(rowInsets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        } else if let detail = model.detail, !detail.items.isEmpty {
+            ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
+                RankMemberRow(item: item)
+                    .listRowInsets(rowInsets)
+                    .listRowBackground(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { openedMember = seedMember(for: item) }
+            }
+        } else {
+            DetailPageNotice(StateNotice(title: "暂无数据", message: model.detail?.emptyText))
+                .listRowInsets(rowInsets)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+        }
     }
 
     /// 用榜行数据做成员卡片入参，避免陌生成员落到「用户」占位。
@@ -164,57 +187,66 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：名次 + 头像 + 名字/勋章铭牌 + 心动数。
+/// 榜单行：名次 + 头像 + 名字（下一行是勋章等级与铭牌）+ 心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
+    private var name: String { item.title.isEmpty ? " " : item.title }
+
+    private var hasSubLine: Bool {
+        !item.levelText.isEmpty || !item.wearTexts.isEmpty
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             Text(item.position > 0 ? "\(item.position)" : "–")
                 .font(.system(size: 15, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(item.position > 0 && item.position <= 3 ? Color.accentColor : Color.primary)
-                .frame(width: 28, alignment: .leading)
+                .frame(width: 24, alignment: .leading)
 
-            AvatarCircle(urlString: item.pic, size: 36)
+            AvatarCircle(urlString: item.pic, size: 40)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 5) {
-                    Text(item.title.isEmpty ? " " : item.title)
-                        .font(.system(size: 14, weight: .semibold))
+                    Text(name)
+                        .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
                     if let selected = AppServices.shared.store.selectedMemberId,
                        !item.itemId.isEmpty,
                        MemberId.matches(item.itemId, selected) {
                         MeBadge()
                     }
-                    // 与 node renderRankItem 一致：WearList 有几段就显示几枚铭牌。
-                    ForEach(item.wearTexts.filter { !$0.isEmpty }, id: \.self) { wear in
-                        Plate(text: wear, filled: true)
-                    }
                 }
-                if !item.descTexts.isEmpty {
-                    Text(item.descTexts.joined(separator: " · "))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+
+                // 第二行：勋章等级 + 勋章铭牌（WearList 有几段就显示几枚）。
+                if hasSubLine {
+                    HStack(spacing: 6) {
+                        if !item.levelText.isEmpty {
+                            Text(item.levelText)
+                                .font(.system(size: 12, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(item.wearTexts.filter { !$0.isEmpty }, id: \.self) { wear in
+                            Plate(text: wear)
+                        }
+                    }
                 }
             }
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
 
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Image(systemName: item.isPraised ? "heart.fill" : "heart")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
                 Text(item.praiseNum > 0 ? Fmt.compact(item.praiseNum) : " ")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
         }
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
