@@ -148,13 +148,15 @@ final class SkinsModel: ObservableObject {
     }
 }
 
-// MARK: - View
+// MARK: - 乐迷皮肤页
 
 struct SkinsView: View {
     @StateObject private var model: SkinsModel
     @State private var selectedSkin: SkinItem?
     @State private var selectedSeries = ""
     @State private var pendingSeries: ProfileDestination?
+    /// 刚关掉弹窗的 0.4 秒内不接收新的点击，避免关闭动画中再开另一个弹窗。
+    @State private var dismissLock = false
     @Namespace private var zoomNS
 
     init(memberId: String, medalId: String, medalName: String, scheme: String) {
@@ -164,31 +166,39 @@ struct SkinsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
-                // 成员信息直接平铺在页面里，左右与下方卡片边缘对齐（16pt）。
-                headerRow
-
-                if model.groups.isEmpty {
-                    stateRow
-                        .padding(.horizontal, 16)
-                } else {
-                    ForEach(model.groups) { group in
-                        seriesCard(group)
-                    }
-
-                    if model.scanning {
-                        scanningRow
-                            .padding(.horizontal, 16)
+        DetailPageScaffold(
+            header: MemberSectionHeader(
+                title: model.member.title,
+                pic: model.member.pic,
+                subtitle: model.headerSubtitle,
+                count: "\(model.displayTotal)",
+                unit: "款"
+            )
+        ) {
+            if model.groups.isEmpty {
+                stateRow
+                    .padding(.horizontal, 16)
+            } else {
+                ForEach(model.groups) { group in
+                    DetailSeriesCard(
+                        title: group.name,
+                        trailing: "已收集 \(group.unlockedCount)/\(group.skins.count)",
+                        onTrailingTap: { pendingSeries = route(for: group) }
+                    ) {
+                        SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
+                            guard !dismissLock else { return }
+                            selectedSeries = group.name
+                            selectedSkin = skin
+                        }
                     }
                 }
+
+                if model.scanning {
+                    scanningRow
+                        .padding(.horizontal, 16)
+                }
             }
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
         }
-        .scrollIndicators(.hidden)
-        // 页面底色用分组灰，白底卡片才有层次（与分组列表页一致）。
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(model.medalName.isEmpty ? "乐迷皮肤" : model.medalName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -201,7 +211,7 @@ struct SkinsView: View {
                 pushDestination(route)
             }
         }
-        .sheet(item: $selectedSkin) { skin in
+        .sheet(item: $selectedSkin, onDismiss: unlockDelay) { skin in
             SkinDetailSheet(
                 skin: skin,
                 seriesName: selectedSeries,
@@ -211,58 +221,12 @@ struct SkinsView: View {
         }
     }
 
-    /// 成员信息：平铺、左右与卡片边缘对齐。
-    private var headerRow: some View {
-        MemberSectionHeader(
-            title: model.member.title,
-            pic: model.member.pic,
-            subtitle: model.headerSubtitle,
-            count: "\(model.displayTotal)",
-            unit: "款"
-        )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 4)
-    }
-
-    /// 一个系列的卡片：标题 + 三列皮肤，白底圆角与系统分组卡片一致。
-    private func seriesCard(_ group: SkinSeriesGroup) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            seriesRow(group)
-            SkinTileGrid(items: Array(group.skins.prefix(3)), zoomNamespace: zoomNS) { skin in
-                selectedSeries = group.name
-                selectedSkin = skin
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .padding(.horizontal, 16)
-    }
-
-    /// 系列标题行：系列名 + 已收集 x/y 箭头。
-    private func seriesRow(_ group: SkinSeriesGroup) -> some View {
-        HStack(spacing: 6) {
-            Text(group.name)
-                .font(.system(size: 16, weight: .semibold))
-            Spacer(minLength: 8)
-            Button {
-                pendingSeries = route(for: group)
-            } label: {
-                HStack(spacing: 2) {
-                    Text("已收集 \(group.unlockedCount)/\(group.skins.count)")
-                        .font(.system(size: 14))
-                        .monospacedDigit()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+    /// 弹窗关闭后短暂锁一下，避免快速点另一个皮肤时新弹窗高度被旧弹窗动画打断。
+    private func unlockDelay() {
+        dismissLock = true
+        Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            dismissLock = false
         }
     }
 
@@ -300,6 +264,71 @@ struct SkinsView: View {
             Text("正在深度扫描乐迷皮肤…")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - 乐迷皮肤系列页（与乐迷皮肤页同一套 UI，只是只有一组卡片）
+
+struct SkinSeriesPage: View {
+    let member: Member
+    let artistName: String
+    let seriesName: String
+    let skins: [SkinItem]
+    let uin: String
+
+    @State private var selectedSkin: SkinItem?
+    @State private var dismissLock = false
+    @Namespace private var zoomNS
+
+    private var unlockedCount: Int { skins.filter { $0.isUnlocked }.count }
+
+    private var headerSubtitle: String {
+        let artist = artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = artist.isEmpty ? fallback : artist
+        return name.isEmpty ? seriesName : "\(name)的\(seriesName)"
+    }
+
+    var body: some View {
+        DetailPageScaffold(
+            header: MemberSectionHeader(
+                title: member.title,
+                pic: member.pic,
+                subtitle: headerSubtitle,
+                count: "\(unlockedCount)",
+                unit: "款"
+            )
+        ) {
+            if skins.isEmpty {
+                StateNotice(title: "这个系列还没有皮肤")
+                    .padding(.horizontal, 16)
+            } else {
+                DetailSeriesCard(title: seriesName) {
+                    SkinTileGrid(items: skins.sorted { $0.seq < $1.seq }, zoomNamespace: zoomNS) { skin in
+                        guard !dismissLock else { return }
+                        selectedSkin = skin
+                    }
+                }
+            }
+        }
+        .navigationTitle(seriesName)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $selectedSkin, onDismiss: unlockDelay) { skin in
+            SkinDetailSheet(
+                skin: skin,
+                seriesName: seriesName,
+                uin: uin,
+                zoomNamespace: zoomNS
+            )
+        }
+    }
+
+    private func unlockDelay() {
+        dismissLock = true
+        Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            dismissLock = false
         }
     }
 }
