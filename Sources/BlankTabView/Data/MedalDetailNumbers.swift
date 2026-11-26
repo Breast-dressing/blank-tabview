@@ -92,7 +92,8 @@ extension QqApi {
     ) {
         if let dict = value as? [String: Any] {
             let ownId = str(dict["MedalID"]).isEmpty ? medalId : str(dict["MedalID"])
-            let number = numberText(of: dict)
+            // 深扫只认 NumberInfo.Content，避免把无关的 Number 字段当编号。
+            let number = MedalDetailNumbers.clean(str(map(dict["NumberInfo"])["Content"]))
             if !number.isEmpty {
                 if ownId.isEmpty {
                     if shared.isEmpty { shared = number }
