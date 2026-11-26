@@ -120,6 +120,7 @@ struct RankDetailView: View {
                             RankMemberRow(item: RankMember())
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else if let error = model.error {
                 DetailPageNotice(
@@ -134,6 +135,7 @@ struct RankDetailView: View {
                             RankMemberRow(item: item)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
                 DetailPageNotice(StateNotice(title: "暂无数据", message: model.detail?.emptyText))
@@ -195,6 +197,7 @@ struct RankMemberRow: View {
             }
         }
         .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
