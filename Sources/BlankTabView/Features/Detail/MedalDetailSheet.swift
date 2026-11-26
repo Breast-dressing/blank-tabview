@@ -21,7 +21,7 @@ struct MedalDetailSheet: View {
             fallback.name = target.medalName
             fallback.picUrl = target.imageUrl
             fallback.createTime = target.date
-            fallback.number = target.number
+            fallback.medalId = target.medalId
             return [fallback]
         }
         return levels
@@ -31,20 +31,27 @@ struct MedalDetailSheet: View {
         pages.indices.contains(index) ? pages[index] : pages[0]
     }
 
-    /// 限定编号：没有就用获得时间顶到编号位。
-    private var primaryText: String {
-        let number = current.number.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !number.isEmpty { return number }
-        let date = Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
-        return date.isEmpty ? "-" : date
+    /// 限定编号：来自勋章卡数据里的 NumberInfo.Content（与 node 项目一致），只有当前分级对得上时用。
+    private var numberText: String {
+        let id = current.medalId
+        if !id.isEmpty && id != target.medalId { return "" }
+        return target.number.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// 第二行：获得时间（有编号时） + 分级信息。
+    private var dateText: String {
+        Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
+    }
+
+    /// 没有限定编号时，获得时间顶到编号位。
+    private var primaryText: String {
+        if !numberText.isEmpty { return numberText }
+        return dateText.isEmpty ? "-" : dateText
+    }
+
+    /// 第二行：有编号时显示获得时间，再加上分级信息。
     private var secondaryText: String {
         var pieces: [String] = []
-        let number = current.number.trimmingCharacters(in: .whitespacesAndNewlines)
-        let date = Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
-        if !number.isEmpty && !date.isEmpty { pieces.append(date) }
+        if !numberText.isEmpty && !dateText.isEmpty { pieces.append(dateText) }
         if pages.count > 1 { pieces.append("第 \(index + 1)/\(pages.count) 级") }
         return pieces.isEmpty ? "--" : pieces.joined(separator: "  ")
     }
@@ -114,7 +121,6 @@ struct MedalDetailSheet: View {
             guard !filtered.isEmpty else { return }
             let sorted = filtered.sorted { $0.level < $1.level }
             levels = sorted
-            // 默认停在点击进来的那一级（接口有对应 medalId 就用它，否则停最高级）。
             if let hit = sorted.firstIndex(where: { $0.medalId == target.medalId && !target.medalId.isEmpty }) {
                 index = hit
             } else {
