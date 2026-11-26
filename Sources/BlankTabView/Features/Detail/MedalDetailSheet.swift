@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// 奖章详情：与皮肤详情完全同一套弹窗外壳、媒体高度、两行文本与「打开」按钮。
-/// 同一枚勋章有多个分级时，弹窗内左右滑动切换。
+/// 同一枚勋章有多个分级时，弹窗内左右滑动切换，编号随当前分级变化。
 struct MedalDetailSheet: View {
     let memberId: String
     let target: MedalSheetTarget
@@ -12,6 +12,7 @@ struct MedalDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var levels: [MedalLevel] = []
+    @State private var numbers = MedalDetailNumbers()
     @State private var index = 0
 
     /// 每页数据：没有接口数据时用点击进来的那一枚兜底。
@@ -31,14 +32,13 @@ struct MedalDetailSheet: View {
         pages.indices.contains(index) ? pages[index] : pages[0]
     }
 
-    /// 限定编号：直接取点击那枚勋章卡里的 NumberInfo.Content（与 node 项目读同一字段）。
+    /// 限定编号：接口 MedalList[*].NumberInfo.Content，其次列表卡带过来的编号。
     private var numberText: String {
-        let trimmed = target.number.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty && trimmed != "NO.----" { return trimmed }
-        // 兜底：部分数据把编号塞在 Corner.Title。
-        let corner = target.cornerTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        if corner.hasPrefix("NO.") { return corner }
-        return ""
+        let fromDetail = numbers.number(for: current.medalId)
+        if !fromDetail.isEmpty { return fromDetail }
+        let fromTarget = MedalDetailNumbers.clean(target.number)
+        if !fromTarget.isEmpty { return fromTarget }
+        return MedalDetailNumbers.clean(target.cornerTitle)
     }
 
     private var dateText: String {
@@ -114,13 +114,14 @@ struct MedalDetailSheet: View {
             index = 0
             return
         }
+        guard !target.medalId.isEmpty else { return }
         do {
-            let detail = try await AppServices.shared.medals.detail(
-                AppServices.shared.hallURL(memberId),
+            let info = try await AppServices.shared.api.fetchMedalDetailNumbers(
                 medalId: target.medalId,
                 encUin: memberId
             )
-            var filtered = detail.levels.filter { !$0.picUrl.isEmpty }
+            numbers = info
+            var filtered = info.levels.filter { !$0.picUrl.isEmpty }
             if filtered.contains(where: { $0.medalId == target.medalId }) {
                 filtered = filtered.filter { $0.medalId == target.medalId || $0.medalId.isEmpty }
             }
@@ -133,7 +134,7 @@ struct MedalDetailSheet: View {
                 index = max(0, sorted.count - 1)
             }
         } catch {
-            // 取不到分级就只显示点击的那一枚。
+            // 取不到分级就只显示点击的那一枚（编号仍可用列表卡带来的）。
         }
     }
 }
