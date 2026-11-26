@@ -1,7 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// 勋章详情：和皮肤详情共用同一套弹窗外壳；同一枚勋章有多个分级时，弹窗内左右滑动切换。
+/// 奖章详情：与皮肤详情完全同一套弹窗外壳、媒体高度、两行文本与「打开」按钮。
+/// 同一枚勋章有多个分级时，弹窗内左右滑动切换。
 struct MedalDetailSheet: View {
     let memberId: String
     let target: MedalSheetTarget
@@ -20,6 +21,7 @@ struct MedalDetailSheet: View {
             fallback.name = target.medalName
             fallback.picUrl = target.imageUrl
             fallback.createTime = target.date
+            fallback.number = target.number
             return [fallback]
         }
         return levels
@@ -29,9 +31,35 @@ struct MedalDetailSheet: View {
         pages.indices.contains(index) ? pages[index] : pages[0]
     }
 
+    /// 限定编号：没有就用获得时间顶到编号位。
+    private var primaryText: String {
+        let number = current.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !number.isEmpty { return number }
+        let date = Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
+        return date.isEmpty ? "-" : date
+    }
+
+    /// 第二行：获得时间（有编号时） + 分级信息。
+    private var secondaryText: String {
+        var pieces: [String] = []
+        let number = current.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        let date = Fmt.compact(current.createTime.isEmpty ? target.date : current.createTime)
+        if !number.isEmpty && !date.isEmpty { pieces.append(date) }
+        if pages.count > 1 { pieces.append("第 \(index + 1)/\(pages.count) 级") }
+        return pieces.isEmpty ? "--" : pieces.joined(separator: "  ")
+    }
+
+    private var openURL: URL? {
+        URL(string: target.scheme)
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 8) {
+            DetailSheetContent(
+                primary: primaryText,
+                secondary: secondaryText,
+                onOpen: open
+            ) {
                 TabView(selection: $index) {
                     ForEach(Array(pages.enumerated()), id: \.offset) { offset, level in
                         MedalLevelPage(level: level, fallbackURL: offset == 0 ? target.imageUrl : "")
@@ -39,26 +67,7 @@ struct MedalDetailSheet: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(current.name.isEmpty ? target.medalName : current.name)
-                        .font(.system(size: 19, weight: .bold))
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        Text(text(for: current))
-                        if pages.count > 1 {
-                            Text("第 \(index + 1)/\(pages.count) 级")
-                        }
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                }
             }
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle(target.medalName.isEmpty ? "勋章详情" : target.medalName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -76,18 +85,14 @@ struct MedalDetailSheet: View {
                 }
             }
         }
-        // 和皮肤详情完全同一套外壳：369 固定高度、禁用玻璃、圆角全程保持。
-        .detailSheetChrome(height: 369)
+        .detailSheetChrome(height: DetailSheetMetrics.height, cornerRadius: 36)
         .zoomNavigationTransitionIfAvailable(id: target.medalId, in: zoomNamespace)
         .task { await load() }
     }
 
-    private func text(for level: MedalLevel) -> String {
-        var pieces: [String] = []
-        let raw = level.createTime.isEmpty ? target.date : level.createTime
-        if let date = Fmt.compact(raw).nilIfEmpty { pieces.append(date) }
-        if level.owned { pieces.append("已获得") }
-        return pieces.isEmpty ? "--" : pieces.joined(separator: "  ")
+    private func open() {
+        guard let openURL else { return }
+        UIApplication.shared.open(openURL)
     }
 
     private func load() async {
@@ -121,7 +126,7 @@ struct MedalDetailSheet: View {
     }
 }
 
-/// 单级勋章：图片（固定 280 高、圆角 28），仅此一页。
+/// 单级勋章：只负责图，尺寸由弹窗骨架统一给。
 private struct MedalLevelPage: View {
     let level: MedalLevel
     let fallbackURL: String
@@ -131,23 +136,10 @@ private struct MedalLevelPage: View {
     private var url: String { level.picUrl.isEmpty ? fallbackURL : level.picUrl }
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                ProgressView()
+        DetailSheetImage(image: image)
+            .task(id: url) {
+                guard !url.isEmpty else { return }
+                image = await RemoteImageLoader.image(for: url)
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: url) {
-            guard !url.isEmpty else { return }
-            image = await RemoteImageLoader.image(for: url)
-        }
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

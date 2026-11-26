@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// 详情页顶部的成员信息：头像 + 名字 / 副标题 + 右侧数量。左右与下方卡片内容对齐。
 struct MemberSectionHeader: View {
     let title: String
     let pic: String
@@ -11,7 +10,8 @@ struct MemberSectionHeader: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            AvatarCircle(urlString: pic, size: 48)
+            // 不要白边：关掉 AvatarCircle 默认的白色描边。
+            AvatarCircle(urlString: pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title.isEmpty ? "未知成员" : title)

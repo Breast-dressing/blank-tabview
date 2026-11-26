@@ -3,7 +3,7 @@ import UIKit
 
 extension SkinItem: Identifiable {}
 
-/// 单个皮肤详情：原生 sheet（固定 369 高度、普通材质背景、隐藏抓手、内容不滚动）。
+/// 单个皮肤详情：和奖章详情共用同一套弹窗外壳与内容骨架。
 struct SkinDetailSheet: View {
     let skin: SkinItem
     let seriesName: String
@@ -12,15 +12,8 @@ struct SkinDetailSheet: View {
     /// 截图 / 调试时用本地图片，避免依赖网络。
     var localImage: UIImage? = nil
 
-    /// 固定高度 369：工具栏 + 图片 + 间距 + 底部一行文本与按钮。
-    private static let baseHeight: CGFloat = 369
-    /// 底部与右侧边距：和工具栏玻璃按钮保持一致。
-    private static let edgeInset: CGFloat = 16
-
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
-    /// 左侧两行文本的实际高度，用来让「打开」按钮等高。
-    @State private var textHeight: CGFloat = 0
 
     private var link: String {
         let safeId = skin.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? skin.id
@@ -45,53 +38,15 @@ struct SkinDetailSheet: View {
         URL(string: link) ?? URL(string: "https://y.qq.com")!
     }
 
-    private var rowHeight: CGFloat { textHeight > 0 ? textHeight : 44 }
-
     var body: some View {
         NavigationStack {
-            GeometryReader { proxy in
-                // 图片高度 = 可用高度 - 间距 8 - 底部行 - 底边距，避免溢出被裁到屏幕外。
-                let imageHeight = max(140, proxy.size.height - rowHeight - 8 - Self.edgeInset)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    imageView
-                        .frame(width: proxy.size.width - 20 - Self.edgeInset, height: imageHeight)
-
-                    HStack(alignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(primaryText)
-                                .font(.system(size: 19, weight: .bold))
-                                .lineLimit(1)
-
-                            Text(secondaryText)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
-
-                        Spacer(minLength: 8)
-
-                        Button {
-                            openInQQMusic()
-                        } label: {
-                            Text("打开")
-                                .font(.system(size: 15, weight: .semibold))
-                                .padding(.horizontal, 14)
-                                .frame(maxHeight: .infinity)
-                        }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.capsule)
-                        .frame(height: rowHeight)
-                    }
-                    .frame(width: proxy.size.width - 20 - Self.edgeInset, alignment: .leading)
-                }
-                .padding(.leading, 20)
-                .padding(.trailing, Self.edgeInset)
-                .padding(.bottom, Self.edgeInset)
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            DetailSheetContent(
+                primary: primaryText,
+                secondary: secondaryText,
+                onOpen: openInQQMusic
+            ) {
+                DetailSheetImage(image: image)
             }
-            .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -109,30 +64,9 @@ struct SkinDetailSheet: View {
                 }
             }
         }
-        // 高度恒为 369：不随图片比例变化，避免关掉再开时 detent 落回全屏。
-        .detailSheetChrome(height: Self.baseHeight)
+        // 高度固定，不随图片比例变化。
+        .detailSheetChrome(height: DetailSheetMetrics.height, cornerRadius: 36)
         .zoomNavigationTransitionIfAvailable(id: skin.id, in: zoomNamespace)
-    }
-
-    /// 用 QQ 音乐打开这张皮肤对应的页面。
-    private func openInQQMusic() {
-        guard let url = URL(string: link) else { return }
-        UIApplication.shared.open(url)
-    }
-
-    private var imageView: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                ProgressView()
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .task(id: skin.pic) {
             if let localImage {
                 image = localImage
@@ -140,6 +74,12 @@ struct SkinDetailSheet: View {
                 image = await RemoteImageLoader.image(for: skin.pic)
             }
         }
+    }
+
+    /// 用 QQ 音乐打开这张皮肤对应的页面。
+    private func openInQQMusic() {
+        guard let url = URL(string: link) else { return }
+        UIApplication.shared.open(url)
     }
 }
 
