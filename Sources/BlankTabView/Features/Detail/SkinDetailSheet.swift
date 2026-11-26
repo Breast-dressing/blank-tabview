@@ -79,10 +79,11 @@ struct SkinDetailSheet: View {
                     .frame(height: textHeight > 0 ? textHeight : 44)
                 }
             }
-            // 左右与底边距跟工具栏按钮一致：左 20 / 右 16 / 底 16。
+            // 左右与底边距跟工具栏按钮一致：左 20 / 右 16 / 底 16（底边向屏幕边缘量，不叠加安全区）。
             .padding(.leading, 20)
             .padding(.trailing, 16)
             .padding(.bottom, 16)
+            .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(skin.name.isEmpty ? "皮肤详情" : skin.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
