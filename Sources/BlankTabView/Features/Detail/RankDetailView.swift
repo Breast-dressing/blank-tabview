@@ -214,24 +214,24 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：称号（WearList 的 Title，caption2 最小说明 + semibold，圆角矩形包裹）
-                //        在前，铭牌（限定编号 NO.xxxx，footnote + semibold，无底色）在后。
+                // 第二行：称号（WearList 的 Title，caption2 最小说明 + semibold，圆角矩形包裹，
+                //         胶囊高度固定 12pt）在前，铭牌（限定编号 NO.xxxx，caption + semibold，无底色）在后。
                 if !wears.isEmpty || !honors.isEmpty {
                     HStack(alignment: .center, spacing: 6) {
                         ForEach(honors, id: \.self) { honor in
                             Text(honor)
                                 .font(.caption2.weight(.semibold))
+                                .lineLimit(1)
                                 .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
+                                .frame(height: 12)
                                 .background(
                                     Color(.tertiarySystemFill),
                                     in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                                 )
-                                .lineLimit(1)
                         }
                         ForEach(wears, id: \.self) { wear in
                             Text(wear)
-                                .font(.footnote.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                         }
