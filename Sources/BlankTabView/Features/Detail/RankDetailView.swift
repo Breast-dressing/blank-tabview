@@ -12,6 +12,7 @@ final class RankDetailModel: ObservableObject {
     let title: String
     private let wantedTab: String
 
+    @Published private(set) var tabs: [MedalTab] = []
     @Published private(set) var tab: MedalTab?
     @Published private(set) var detail: RankDetail?
     @Published private(set) var loading = true
@@ -26,13 +27,18 @@ final class RankDetailModel: ObservableObject {
         self.member = AppServices.shared.member(memberId)
     }
 
-    /// 只展示进入时点的那个榜：页面里不再有分类切换。
+    /// 首屏：进入时点默认选中的榜。
     func load() async {
         loading = true
         error = nil
         // 仅 CI 截图核对：-demoRank 直接喂演示数据。
         if ProcessInfo.processInfo.arguments.contains("-demoRank") {
-            tab = MedalTab(name: "周榜", type: 1, id: 1)
+            tabs = [
+                MedalTab(name: "周榜", type: 1, id: 1),
+                MedalTab(name: "月榜", type: 2, id: 2),
+                MedalTab(name: "总榜", type: 3, id: 3)
+            ]
+            tab = tabs[0]
             detail = RankDetail(items: Self.demoMembers)
             loading = false
             return
@@ -56,6 +62,7 @@ final class RankDetailModel: ObservableObject {
                 }
             }
             index = min(max(index, 0), page.tabs.count - 1)
+            tabs = page.tabs
             let chosen = page.tabs[index]
             tab = chosen
 
@@ -67,6 +74,25 @@ final class RankDetailModel: ObservableObject {
         } catch {
             self.error = error.localizedDescription
             detail = nil
+        }
+        loading = false
+    }
+
+    /// 切换榜单标签：重新拉该榜的分页数据。
+    func select(_ target: MedalTab) async {
+        guard target.id != tab?.id else { return }
+        if ProcessInfo.processInfo.arguments.contains("-demoRank") {
+            tab = target
+            return
+        }
+        loading = true
+        error = nil
+        do {
+            let detail = try await services.medals.rankTab(scheme, tab: target)
+            tab = target
+            self.detail = detail
+        } catch {
+            self.error = error.localizedDescription
         }
         loading = false
     }
@@ -98,6 +124,16 @@ struct RankDetailView: View {
     init(memberId: String, scheme: String, title: String, tabName: String) {
         _model = StateObject(
             wrappedValue: RankDetailModel(memberId: memberId, scheme: scheme, title: title, tabName: tabName)
+        )
+    }
+
+    private var tabSelection: Binding<Int> {
+        Binding(
+            get: { model.tab?.id ?? model.tabs.first?.id ?? 0 },
+            set: { id in
+                guard let target = model.tabs.first(where: { $0.id == id }) else { return }
+                Task { await model.select(target) }
+            }
         )
     }
 
@@ -143,10 +179,24 @@ struct RankDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                if showsHeaderTitle {
-                    Text(headerSubtitle)
-                        .font(.headline)
-                        .lineLimit(1)
+                VStack(spacing: 2) {
+                    if model.tabs.count > 1 {
+                        Picker("排行榜", selection: tabSelection) {
+                            ForEach(model.tabs, id: \.id) { item in
+                                Text(Fmt.cleanTabName(item.name)).tag(item.id)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .frame(maxWidth: 260)
+                    }
+                    if showsHeaderTitle {
+                        Text(headerSubtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -172,8 +222,6 @@ struct RankDetailView: View {
             // 加载中也复用同一套行，只是喂空数据。
             ForEach(0..<8, id: \.self) { _ in
                 RankMemberRow(item: RankMember())
-                    .listRowInsets(rowInsets)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                     .listRowBackground(Color.clear)
             }
         } else if let error = model.error {
@@ -188,8 +236,6 @@ struct RankDetailView: View {
         } else if let detail = model.detail, !detail.items.isEmpty {
             ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
                 RankMemberRow(item: item)
-                    .listRowInsets(rowInsets)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                     .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture { openedMember = seedMember(for: item) }
@@ -246,8 +292,7 @@ struct RankMemberRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            // 头像贴最左；分隔线起点由行上固定的头像宽度决定（见 rows 里的 alignmentGuide），
-            // 头像下方因此不出现分隔线，也不受名次文本长度影响。
+            // 头像贴最左；行内边距与分隔线缩进全部交给系统默认（系统会避让前导图）。
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             // 名次在头像右侧：与成员名字同一语义字号（subheadline + bold），数字横向居中。
