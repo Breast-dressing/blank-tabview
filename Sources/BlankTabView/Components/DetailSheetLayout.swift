@@ -45,9 +45,10 @@ struct DetailSheetContent<Media: View>: View {
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        // 限定编号 / 标题：系统语义字号 title3（默认 20pt）+ 粗体。
+                        // 限定编号 / 标题：系统语义字号 title3（默认 20pt）+ bold 字重。
                         Text(primary)
-                            .font(.title3.bold())
+                            .font(.title3)
+                            .fontWeight(.bold)
                             .lineLimit(1)
 
                         Text(secondary)

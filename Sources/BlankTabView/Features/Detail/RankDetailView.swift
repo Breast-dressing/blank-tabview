@@ -188,8 +188,9 @@ struct RankMemberRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            // 名次：语义字号 subheadline（默认 15pt）+ bold。
             Text(item.position > 0 ? "\(item.position)" : "–")
-                .font(.caption)
+                .font(.subheadline.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(item.position > 0 && item.position <= 3 ? Color.accentColor : Color.primary)
                 .frame(width: 24, alignment: .leading)
@@ -198,10 +199,10 @@ struct RankMemberRow: View {
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 3) {
-                // 第一行：成员名字。
+                // 第一行：成员名字（语义字号 footnote + bold）。
                 HStack(spacing: 6) {
                     Text(name)
-                        .font(.body)
+                        .font(.footnote.weight(.bold))
                         .lineLimit(1)
                     if let selected = AppServices.shared.store.selectedMemberId,
                        !item.itemId.isEmpty,
