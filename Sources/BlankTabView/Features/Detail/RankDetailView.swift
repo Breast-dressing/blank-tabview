@@ -92,6 +92,8 @@ struct RankDetailView: View {
     @State private var openedMember: Member?
     /// 分享图（点工具栏分享按钮后离屏渲染出来，再走系统分享面板）。
     @State private var shareImage: ShareImage?
+    /// 顶部成员信息被完全滚出屏幕后，工具栏中央显示它的第二行文本。
+    @State private var showsHeaderTitle = false
 
     init(memberId: String, scheme: String, title: String, tabName: String) {
         _model = StateObject(
@@ -121,6 +123,14 @@ struct RankDetailView: View {
             .listRowInsets(rowInsets)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: HeaderBottomKey.self, value: geo.frame(in: .global).maxY)
+                }
+            )
+            .onPreferenceChange(HeaderBottomKey.self) { bottom in
+                showsHeaderTitle = bottom < 104
+            }
 
             // 榜名已由导航栏标题承担，不再放灰色分节标题。
             rows
@@ -132,6 +142,13 @@ struct RankDetailView: View {
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                if showsHeaderTitle {
+                    Text(headerSubtitle)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     guard let image = makeShareImage() else { return }
@@ -157,7 +174,6 @@ struct RankDetailView: View {
                 RankMemberRow(item: RankMember())
                     .listRowInsets(rowInsets)
                     .listRowBackground(Color.clear)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
             }
         } else if let error = model.error {
             DetailPageNotice(
@@ -173,7 +189,6 @@ struct RankDetailView: View {
                 RankMemberRow(item: item)
                     .listRowInsets(rowInsets)
                     .listRowBackground(Color.clear)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     .contentShape(Rectangle())
                     .onTapGesture { openedMember = seedMember(for: item) }
             }
@@ -213,7 +228,7 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：头像在最左，右侧依次是名次与三行文本；最右是实心爱心与心动数。
+/// 榜单行：名次在左，头像其次，中间三行文本；最右是实心爱心与心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -222,21 +237,14 @@ struct RankMemberRow: View {
     private var honors: [String] { item.honorTexts.filter { !$0.isEmpty } }
     /// 称号胶囊高度：始终等于同排铭牌文字的实际高度（随语义字号自动变化）。
     @State private var plateHeight: CGFloat = 0
-    /// 名字 + 称号这两行的高度：右侧爱心图标的高度与它一致。
-    @State private var nameBlockHeight: CGFloat = 0
     /// 点赞数弹窗：1 万及以上点开显示完整数值。
     @State private var showExactPraise = false
     /// 没有铭牌时的兜底高度：说明（caption）语义字号的行高，随动态字体缩放。
     @ScaledMetric(relativeTo: .caption) private var captionHeight: CGFloat = 15
 
-    private var heartHeight: CGFloat { nameBlockHeight > 0 ? nameBlockHeight : 34 }
-
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            // 头像贴最左（列表默认边距），与页面顶部成员信息同尺寸，且不要白边。
-            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
-
-            // 名次放在头像右侧、文本左侧：与成员名字同一语义字号（subheadline + bold），横向居中。
+        HStack(alignment: .center, spacing: 12) {
+            // 名次：与成员名字同一语义字号（subheadline + bold），数字横向居中，前三名不做特殊处理。
             Text(item.position > 0 ? "\(item.position)" : "–")
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
@@ -244,56 +252,51 @@ struct RankMemberRow: View {
                 .frame(width: 28)
                 .multilineTextAlignment(.center)
 
-            VStack(alignment: .leading, spacing: 3) {
-                // 名字与称号两行：整体量高，供右侧爱心对齐。
-                VStack(alignment: .leading, spacing: 3) {
-                    // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
-                    HStack(spacing: 6) {
-                        Text(name)
-                            .font(.subheadline.weight(.bold))
-                            .lineLimit(1)
-                        if let selected = AppServices.shared.store.selectedMemberId,
-                           !item.itemId.isEmpty,
-                           MemberId.matches(item.itemId, selected) {
-                            MeBadge()
-                        }
-                    }
+            // 头像与页面顶部成员信息同尺寸，且不要白边。
+            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
-                    // 第二行：称号（WearList 的 Title，caption2 最小说明、默认字重，长条胶囊包裹，
-                    //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，caption 说明语义 + semibold，无底色）在后。
-                    if !wears.isEmpty || !honors.isEmpty {
-                        HStack(alignment: .center, spacing: 6) {
-                            ForEach(honors, id: \.self) { honor in
-                                Text(honor)
-                                    .font(.caption2)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 8)
-                                    .frame(height: plateHeight > 0 ? plateHeight : captionHeight)
-                                    .background(Color(.tertiarySystemFill), in: Capsule())
-                            }
-                            ForEach(wears, id: \.self) { wear in
-                                Text(wear)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.preference(key: PlateHeightKey.self, value: geo.size.height)
-                                        }
-                                    )
-                            }
-                        }
+            VStack(alignment: .leading, spacing: 3) {
+                // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(.subheadline.weight(.bold))
                         .lineLimit(1)
-                        .onPreferenceChange(PlateHeightKey.self) { height in
-                            if height > 0 { plateHeight = height }
-                        }
+                    if let selected = AppServices.shared.store.selectedMemberId,
+                       !item.itemId.isEmpty,
+                       MemberId.matches(item.itemId, selected) {
+                        MeBadge()
                     }
                 }
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: NameBlockHeightKey.self, value: geo.size.height)
+
+                // 第二行：称号（WearList 的 Title，caption2 最小说明、默认字重，长条胶囊包裹，
+                //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，caption 说明语义 + semibold，无底色）在后。
+                if !wears.isEmpty || !honors.isEmpty {
+                    HStack(alignment: .center, spacing: 6) {
+                        ForEach(honors, id: \.self) { honor in
+                            Text(honor)
+                                .font(.caption2)
+                                .lineLimit(1)
+                                .padding(.horizontal, 8)
+                                .frame(height: plateHeight > 0 ? plateHeight : captionHeight)
+                                .background(Color(.tertiarySystemFill), in: Capsule())
+                        }
+                        ForEach(wears, id: \.self) { wear in
+                            Text(wear)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.preference(key: PlateHeightKey.self, value: geo.size.height)
+                                    }
+                                )
+                        }
                     }
-                )
+                    .lineLimit(1)
+                    .onPreferenceChange(PlateHeightKey.self) { height in
+                        if height > 0 { plateHeight = height }
+                    }
+                }
 
                 // 第三行：原来的副文案（DescList，caption2 最小说明字号）。
                 if !item.descTexts.isEmpty {
@@ -306,12 +309,10 @@ struct RankMemberRow: View {
 
             Spacer(minLength: 8)
 
-            // 右侧：实心爱心（顶部与名字顶部对齐，高度等于名字 + 称号两行），点赞数另起一行与副文案同高。
-            VStack(alignment: .trailing, spacing: 3) {
+            // 心动数：实心爱心在上、数字在下方，数字用 caption（说明）语义字号。
+            VStack(spacing: 2) {
                 Image(systemName: "heart.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: heartHeight, height: heartHeight)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
                     .contentShape(Rectangle())
                     .onTapGesture { revealExactPraise() }
@@ -330,12 +331,9 @@ struct RankMemberRow: View {
                     }
             }
         }
-        .onPreferenceChange(NameBlockHeightKey.self) { height in
-            if height > 0 { nameBlockHeight = height }
-        }
     }
 
-    /// 1 万及以上才弹具体数值；不足 1 万时数字本身就是完整值，不弹。
+    /// 1 万及以上才弹具体数值；不足 1 万数字本身就是完整值，不弹。
     private func revealExactPraise() {
         if item.praiseNum >= 10000 { showExactPraise = true }
     }
@@ -347,10 +345,10 @@ struct RankMemberRow: View {
     }
 }
 
-private struct NameBlockHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+private struct HeaderBottomKey: PreferenceKey {
+    static var defaultValue: CGFloat = 1000
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
+        value = min(value, nextValue())
     }
 }
 
