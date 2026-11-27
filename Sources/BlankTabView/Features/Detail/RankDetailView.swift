@@ -308,32 +308,36 @@ struct RankMemberRow: View {
 
             // 右侧：实心爱心（顶部与名字顶部对齐，高度等于名字 + 称号两行），点赞数另起一行与副文案同高。
             VStack(alignment: .trailing, spacing: 3) {
-                Button {
-                    if item.praiseNum >= 10000 { showExactPraise = true }
-                } label: {
-                    Image(systemName: "heart.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: heartHeight, height: heartHeight)
-                        .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showExactPraise, arrowEdge: .top) {
-                    Text(RankPraise.exact(item.praiseNum))
-                        .font(.footnote.monospacedDigit())
-                        .padding(12)
-                        .presentationCompactAdaptation(.popover)
-                }
+                Image(systemName: "heart.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: heartHeight, height: heartHeight)
+                    .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
+                    .contentShape(Rectangle())
+                    .onTapGesture { revealExactPraise() }
 
                 Text(item.praiseNum > 0 ? RankPraise.short(item.praiseNum) : " ")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                    .contentShape(Rectangle())
+                    .onTapGesture { revealExactPraise() }
+                    .popover(isPresented: $showExactPraise, arrowEdge: .top) {
+                        Text(RankPraise.exact(item.praiseNum))
+                            .font(.footnote.monospacedDigit())
+                            .padding(12)
+                            .presentationCompactAdaptation(.popover)
+                    }
             }
         }
         .onPreferenceChange(NameBlockHeightKey.self) { height in
             if height > 0 { nameBlockHeight = height }
         }
+    }
+
+    /// 1 万及以上才弹具体数值；不足 1 万时数字本身就是完整值，不弹。
+    private func revealExactPraise() {
+        if item.praiseNum >= 10000 { showExactPraise = true }
     }
 }
 
