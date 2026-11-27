@@ -45,8 +45,9 @@ struct DetailSheetContent<Media: View>: View {
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
+                        // 限定编号 / 标题：系统语义字号 title3（默认 20pt）+ 粗体。
                         Text(primary)
-                            .font(.system(size: 19, weight: .bold))
+                            .font(.title3.bold())
                             .lineLimit(1)
 
                         Text(secondary)
@@ -60,7 +61,7 @@ struct DetailSheetContent<Media: View>: View {
 
                     Button(action: onOpen) {
                         Text("打开")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, 14)
                             .frame(maxHeight: .infinity)
                     }

@@ -241,7 +241,7 @@ struct Plate: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(filled ? Color.primary : Color.secondary)
             .lineLimit(1)
             .padding(.horizontal, 7)

@@ -83,9 +83,7 @@ final class RankDetailModel: ObservableObject {
 
 // MARK: - View
 
-/// 榜单详情：用系统电话「最近通话」式的 List 行（原生 List，不画卡片）；
-/// 成员信息同样是 List 里的首行。列表底色用 `.scrollContentBackground(.hidden)`
-/// 关掉系统白底，页面底色保持分组灰。
+/// 榜单详情：系统电话「最近通话」式列表（原生 List，不画卡片），页面底色统一分组灰。
 struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
     /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
@@ -120,7 +118,7 @@ struct RankDetailView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
-            // 榜名已由导航栏标题承担，不再放灰色分节标题（电话列表没有分节头）。
+            // 榜名已由导航栏标题承担，不再放灰色分节标题。
             rows
         }
         .listStyle(.plain)
@@ -191,7 +189,7 @@ struct RankMemberRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(item.position > 0 ? "\(item.position)" : "–")
-                .font(.system(size: 15, weight: .bold))
+                .font(.caption)
                 .monospacedDigit()
                 .foregroundStyle(item.position > 0 && item.position <= 3 ? Color.accentColor : Color.primary)
                 .frame(width: 24, alignment: .leading)
@@ -203,7 +201,7 @@ struct RankMemberRow: View {
                 // 第一行：成员名字。
                 HStack(spacing: 6) {
                     Text(name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body)
                         .lineLimit(1)
                     if let selected = AppServices.shared.store.selectedMemberId,
                        !item.itemId.isEmpty,
@@ -212,7 +210,7 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：勋章铭牌（WearList 有几段就显示几枚）。
+                // 第二行：勋章铭牌（caption 字号，见 Plate 组件）。
                 if !wears.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(wears, id: \.self) { wear in
@@ -224,7 +222,7 @@ struct RankMemberRow: View {
                 // 第三行：原来的副文案（DescList）。
                 if !item.descTexts.isEmpty {
                     Text(item.descTexts.joined(separator: " · "))
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -234,10 +232,10 @@ struct RankMemberRow: View {
 
             HStack(spacing: 4) {
                 Image(systemName: item.isPraised ? "heart.fill" : "heart")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
                 Text(item.praiseNum > 0 ? Fmt.compact(item.praiseNum) : " ")
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
