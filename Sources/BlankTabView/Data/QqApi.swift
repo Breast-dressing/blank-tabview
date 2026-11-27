@@ -471,10 +471,10 @@ final class QqApi: @unchecked Sendable {
         var wear: [String] = []
         var honors: [String] = []
         for entry in Self.list(item["WearList"]) {
-            // 铭牌：WearList.Segment.Contents 里每个 Content 单独一条（不拼接）。
+            // 铭牌：只取 WearList.Segment.Contents 里的限定编号（NO.xxxxx），其余 Content 全部丢弃。
             for content in Self.list(Self.map(entry["Segment"])["Contents"]) {
                 let text = Self.str(content["Content"]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !text.isEmpty { wear.append(text) }
+                if text.hasPrefix("NO.") { wear.append(text) }
             }
             // 称号：直接取 WearList.Title，不做任何裁剪。
             let honor = Self.str(entry["Title"]).trimmingCharacters(in: .whitespacesAndNewlines)
