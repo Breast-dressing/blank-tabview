@@ -14,11 +14,12 @@ struct MemberSectionHeader: View {
             AvatarCircle(urlString: pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 2) {
+                // 成员名字与名字下方那行：iOS 标题行（headline）语义字号，字重保持 bold。
                 Text(title.isEmpty ? "未知成员" : title)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.headline.weight(.bold))
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.headline.weight(.bold))
                     .lineLimit(1)
             }
 
@@ -26,8 +27,9 @@ struct MemberSectionHeader: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    // 上榜人数：iOS 三级标题（title3）语义字号，字重保持 bold。
                     Text(count)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.title3.weight(.bold))
                     if !unit.isEmpty {
                         Text(unit)
                             .font(.footnote)

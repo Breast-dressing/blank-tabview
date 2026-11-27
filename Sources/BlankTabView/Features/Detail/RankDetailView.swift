@@ -119,7 +119,7 @@ struct RankDetailView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
-            // 榜名已由导航栏标题承担，不再放灰色分节标题。
+            // 榜名已由页面内容与导航栏返回承担，不再放灰色分节标题。
             rows
         }
         .listStyle(.plain)
@@ -128,8 +128,6 @@ struct RankDetailView: View {
         .navigationDestination(item: $openedMember) { member in
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
-        .navigationTitle(model.title)
-        .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
     }
@@ -180,7 +178,7 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：第一行成员名字，第二行称号 + 铭牌，第三行副文案；右侧是心动数。
+/// 榜单行：头像在最左，右侧依次是名次与三行文本；最右是心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -193,17 +191,17 @@ struct RankMemberRow: View {
     @ScaledMetric(relativeTo: .caption) private var captionHeight: CGFloat = 15
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // 名次：与成员名字同一语义字号（subheadline + bold），数字横向居中，前三名不做特殊处理。
+        HStack(alignment: .center, spacing: 10) {
+            // 头像贴最左（列表默认边距），与页面顶部成员信息同尺寸，且不要白边。
+            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
+
+            // 名次放在头像右侧、文本左侧：与成员名字同一语义字号（subheadline + bold），横向居中。
             Text(item.position > 0 ? "\(item.position)" : "–")
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(Color.primary)
                 .frame(width: 28)
                 .multilineTextAlignment(.center)
-
-            // 头像与页面顶部成员信息同尺寸，且不要白边。
-            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 3) {
                 // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
