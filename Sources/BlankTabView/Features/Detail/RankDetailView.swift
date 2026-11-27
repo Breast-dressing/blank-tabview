@@ -75,8 +75,8 @@ final class RankDetailModel: ObservableObject {
         item.position = position
         item.title = "乐迷用户 \(position)"
         item.wearTexts = position <= 3 ? ["NO.5200370"] : []
-        item.honorTexts = position <= 3 ? ["SEVENTEEN"] : []
-        item.descTexts = ["贡献值 \(1000 - position * 60)"]
+        item.honorTexts = position <= 3 ? ["月第1 马鞍山 CARAT"] : []
+        item.descTexts = ["乐迷值 50546", "上榜12次"]
         item.praiseNum = 1200 - position * 45
         return item
     }
@@ -180,7 +180,7 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：第一行成员名字，第二行勋章铭牌 + 称号，第三行副文案；右侧是心动数。
+/// 榜单行：第一行成员名字，第二行称号 + 铭牌，第三行副文案；右侧是心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -214,15 +214,10 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：铭牌（WearList 的 Content，caption + semibold，纯文本无底色）
-                //        + 称号（WearList 的 Title，caption2 + semibold，圆角矩形包裹）。
+                // 第二行：称号（WearList 的 Title，caption2 最小说明 + semibold，圆角矩形包裹）
+                //        在前，铭牌（限定编号 NO.xxxx，footnote + semibold，无底色）在后。
                 if !wears.isEmpty || !honors.isEmpty {
                     HStack(alignment: .center, spacing: 6) {
-                        ForEach(wears, id: \.self) { wear in
-                            Text(wear)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
-                        }
                         ForEach(honors, id: \.self) { honor in
                             Text(honor)
                                 .font(.caption2.weight(.semibold))
@@ -234,13 +229,19 @@ struct RankMemberRow: View {
                                 )
                                 .lineLimit(1)
                         }
+                        ForEach(wears, id: \.self) { wear in
+                            Text(wear)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        }
                     }
                     .lineLimit(1)
                 }
 
                 // 第三行：原来的副文案（DescList，caption2 最小说明字号）。
                 if !item.descTexts.isEmpty {
-                    Text(item.descTexts.joined(separator: " · "))
+                    Text(item.descTexts.joined(separator: "  "))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
