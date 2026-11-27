@@ -75,6 +75,7 @@ final class RankDetailModel: ObservableObject {
         item.position = position
         item.title = "乐迷用户 \(position)"
         item.wearTexts = position <= 3 ? ["铁粉"] : []
+        item.honorTexts = position <= 3 ? ["SEVENTEEN"] : []
         item.descTexts = ["贡献值 \(1000 - position * 60)"]
         item.praiseNum = 1200 - position * 45
         return item
@@ -179,30 +180,32 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：第一行成员名字，第二行勋章铭牌，第三行副文案；右侧是心动数。
+/// 榜单行：第一行成员名字，第二行勋章铭牌 + 称号，第三行副文案；右侧是心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
     private var name: String { item.title.isEmpty ? " " : item.title }
     private var wears: [String] { item.wearTexts.filter { !$0.isEmpty } }
+    private var honors: [String] { item.honorTexts.filter { !$0.isEmpty } }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            // 名次：语义字号 subheadline（默认 15pt）+ bold。
+            // 名次：与成员名字同一语义字号（subheadline + bold），数字横向居中，前三名不做特殊处理。
             Text(item.position > 0 ? "\(item.position)" : "–")
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
-                .foregroundStyle(item.position > 0 && item.position <= 3 ? Color.accentColor : Color.primary)
-                .frame(width: 24, alignment: .leading)
+                .foregroundStyle(Color.primary)
+                .frame(width: 28)
+                .multilineTextAlignment(.center)
 
             // 头像与页面顶部成员信息同尺寸，且不要白边。
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 3) {
-                // 第一行：成员名字（语义字号 footnote + bold）。
+                // 第一行：成员名字（字号与名次一致：subheadline + bold）。
                 HStack(spacing: 6) {
                     Text(name)
-                        .font(.footnote.weight(.bold))
+                        .font(.subheadline.weight(.bold))
                         .lineLimit(1)
                     if let selected = AppServices.shared.store.selectedMemberId,
                        !item.itemId.isEmpty,
@@ -211,19 +214,27 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：勋章铭牌（caption 字号，见 Plate 组件）。
-                if !wears.isEmpty {
-                    HStack(spacing: 6) {
+                // 第二行：勋章铭牌（caption 语义字号 + semibold，纯文本、无圆角矩形底色）+ 称号（caption2 + semibold）。
+                if !wears.isEmpty || !honors.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         ForEach(wears, id: \.self) { wear in
-                            Plate(text: wear)
+                            Text(wear)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        ForEach(honors, id: \.self) { honor in
+                            Text(honor)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
                         }
                     }
+                    .lineLimit(1)
                 }
 
-                // 第三行：原来的副文案（DescList）。
+                // 第三行：原来的副文案（DescList，caption2 最小说明字号）。
                 if !item.descTexts.isEmpty {
                     Text(item.descTexts.joined(separator: " · "))
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
