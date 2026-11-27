@@ -187,6 +187,7 @@ struct RankDetailView: View {
             rows
         }
         .listStyle(.plain)
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationDestination(item: $openedMember) { member in
