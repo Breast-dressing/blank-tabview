@@ -228,7 +228,7 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：名次在左，头像其次，中间三行文本；最右是实心爱心与心动数。
+/// 榜单行：头像在最左，右侧依次是名次与三行文本；最右是实心爱心与心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -243,17 +243,19 @@ struct RankMemberRow: View {
     @ScaledMetric(relativeTo: .caption) private var captionHeight: CGFloat = 15
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // 名次：与成员名字同一语义字号（subheadline + bold），数字横向居中，前三名不做特殊处理。
+        HStack(alignment: .center, spacing: 10) {
+            // 头像贴最左；分隔线让系统从头像右缘起，头像下方不出现分隔线，
+            // 且这个起点只由头像宽度决定，不受名次文本长度影响。
+            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
+                .alignmentGuide(.listRowSeparatorLeading) { $0.width }
+
+            // 名次在头像右侧：与成员名字同一语义字号（subheadline + bold），数字横向居中。
             Text(item.position > 0 ? "\(item.position)" : "–")
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(Color.primary)
                 .frame(width: 28)
                 .multilineTextAlignment(.center)
-
-            // 头像与页面顶部成员信息同尺寸，且不要白边。
-            AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 3) {
                 // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
