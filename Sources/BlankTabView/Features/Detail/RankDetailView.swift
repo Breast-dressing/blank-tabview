@@ -13,6 +13,9 @@ final class RankDetailModel: ObservableObject {
     private let wantedTab: String
 
     @Published private(set) var tabs: [MedalTab] = []
+    /// 列表按页追加：首屏只上 20 行，滚到底再追加下一页。
+    @Published private(set) var visibleCount = 20
+    let pageSize = 20
     @Published private(set) var tab: MedalTab?
     @Published private(set) var detail: RankDetail?
     @Published private(set) var loading = true
@@ -40,6 +43,7 @@ final class RankDetailModel: ObservableObject {
             ]
             tab = tabs[0]
             detail = RankDetail(items: Self.demoMembers)
+            visibleCount = pageSize
             loading = false
             return
         }
@@ -71,6 +75,7 @@ final class RankDetailModel: ObservableObject {
             } else {
                 detail = try await services.medals.rankTab(scheme, tab: chosen)
             }
+            visibleCount = pageSize
         } catch {
             self.error = error.localizedDescription
             detail = nil
@@ -91,10 +96,20 @@ final class RankDetailModel: ObservableObject {
             let detail = try await services.medals.rankTab(scheme, tab: target)
             tab = target
             self.detail = detail
+            visibleCount = pageSize
         } catch {
             self.error = error.localizedDescription
         }
         loading = false
+    }
+
+    /// 滚到接近本页末尾时再追加一页。
+    func revealMoreIfNeeded(after item: RankMember) {
+        guard let items = detail?.items, !items.isEmpty else { return }
+        guard let index = items.firstIndex(where: { $0.itemId == item.itemId && $0.position == item.position }) else { return }
+        if index >= visibleCount - 2, visibleCount < items.count {
+            visibleCount = min(visibleCount + pageSize, items.count)
+        }
     }
 
     static let demoMembers: [RankMember] = (1...10).map { position in
@@ -118,8 +133,6 @@ struct RankDetailView: View {
     @State private var openedMember: Member?
     /// 分享图（点工具栏分享按钮后离屏渲染出来，再走系统分享面板）。
     @State private var shareImage: ShareImage?
-    /// 顶部成员信息被完全滚出屏幕后，工具栏中央显示它的第二行文本。
-    @State private var showsHeaderTitle = false
 
     init(memberId: String, scheme: String, title: String, tabName: String) {
         _model = StateObject(
@@ -137,6 +150,16 @@ struct RankDetailView: View {
         )
     }
 
+    /// 顶部成员信息里的名次：当前选中成员在该榜的名次。
+    private var myRankText: String {
+        let selected = AppServices.shared.store.selectedMemberId ?? model.member.itemId
+        guard !selected.isEmpty,
+              let hit = model.detail?.items.first(where: { MemberId.matches($0.itemId, selected) }) else {
+            return "—"
+        }
+        return "\(hit.position)"
+    }
+
     private var headerSubtitle: String {
         let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
         let listName = model.tab.map { Fmt.cleanTabName($0.name) } ?? model.title
@@ -152,21 +175,13 @@ struct RankDetailView: View {
                 title: model.member.title,
                 pic: model.member.pic,
                 subtitle: headerSubtitle,
-                count: "\(model.detail?.items.count ?? 0)",
-                unit: "人",
-                label: "上榜"
+                count: myRankText,
+                unit: "名",
+                label: "名次"
             )
             .listRowInsets(rowInsets)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: HeaderBottomKey.self, value: geo.frame(in: .global).maxY)
-                }
-            )
-            .onPreferenceChange(HeaderBottomKey.self) { bottom in
-                showsHeaderTitle = bottom < 104
-            }
 
             // 榜名已由导航栏标题承担，不再放灰色分节标题。
             rows
@@ -179,24 +194,16 @@ struct RankDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    if model.tabs.count > 1 {
-                        Picker("排行榜", selection: tabSelection) {
-                            ForEach(model.tabs, id: \.id) { item in
-                                Text(Fmt.cleanTabName(item.name)).tag(item.id)
-                            }
+                if model.tabs.count > 1 {
+                    Picker("排行榜", selection: tabSelection) {
+                        ForEach(Array(model.tabs.prefix(3).enumerated()), id: \.element.id) { index, item in
+                            Text(index == 2 ? "总榜" : Fmt.cleanTabName(item.name)).tag(item.id)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .controlSize(.small)
-                        .frame(maxWidth: 260)
                     }
-                    if showsHeaderTitle {
-                        Text(headerSubtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.mini)
+                    .frame(maxWidth: 240, maxHeight: 26)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -234,10 +241,11 @@ struct RankDetailView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         } else if let detail = model.detail, !detail.items.isEmpty {
-            ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
+            ForEach(Array(detail.items.prefix(model.visibleCount).enumerated()), id: \.offset) { _, item in
                 RankMemberRow(item: item)
                     .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
+                    .onAppear { model.revealMoreIfNeeded(after: item) }
                     .onTapGesture { openedMember = seedMember(for: item) }
             }
         } else {
@@ -305,16 +313,9 @@ struct RankMemberRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(.subheadline.weight(.bold))
-                        .lineLimit(1)
-                    if let selected = AppServices.shared.store.selectedMemberId,
-                       !item.itemId.isEmpty,
-                       MemberId.matches(item.itemId, selected) {
-                        MeBadge()
-                    }
-                }
+                Text(name)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(1)
 
                 // 第二行：称号（WearList 的 Title，caption2 最小说明、默认字重，长条胶囊包裹，
                 //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，caption 说明语义 + semibold，无底色）在后。
@@ -390,13 +391,6 @@ struct RankMemberRow: View {
 #Preview {
     NavigationStack {
         RankDetailView(memberId: "12345", scheme: "https://i2.y.qq.com/x?a=1", title: "周榜", tabName: "周榜")
-    }
-}
-
-private struct HeaderBottomKey: PreferenceKey {
-    static var defaultValue: CGFloat = 1000
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = min(value, nextValue())
     }
 }
 
