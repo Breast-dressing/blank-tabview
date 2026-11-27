@@ -283,6 +283,8 @@ struct RankMember: Hashable, Sendable {
     var itemId: String = ""
     /// 勋章铭牌文案（WearList.Segment.Contents）。
     var wearTexts: [String] = []
+    /// 成员称号（WearList.Title 去掉等级后缀）。
+    var honorTexts: [String] = []
     var descTexts: [String] = []
     var praiseNum: Int = 0
     var isPraised: Bool = false
