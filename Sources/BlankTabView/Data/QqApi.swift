@@ -120,7 +120,7 @@ final class QqApi: @unchecked Sendable {
             if !id.isEmpty { seen.insert(id) }
         }
 
-        let remaining: [[String: Any]] = itemList.filter { !seen.contains(Self.str($0["ItemID"])) }
+        let remaining: [[String: Any]] = itemList.filter { !seen.contains(Self.str($0["ItemID")) }
 
         if !remaining.isEmpty {
             let batch = try await cgi(
@@ -466,6 +466,7 @@ final class QqApi: @unchecked Sendable {
 
     private func parseRankMember(_ item: [String: Any], fallbackPosition: Int) -> RankMember {
         var wear: [String] = []
+        var honors: [String] = []
         for entry in Self.list(item["WearList"]) {
             let contents = Self.list(Self.map(entry["Segment"])["Contents"])
                 .map { Self.str($0["Content"]) }
@@ -473,6 +474,11 @@ final class QqApi: @unchecked Sendable {
                 .joined(separator: " ")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !contents.isEmpty { wear.append(contents) }
+            // 称号：WearList.Title 去掉 V6 这类等级后缀后的文本（称号与铭牌同一条目）。
+            let honor = Self.str(entry["Title"])
+                .replacingOccurrences(of: "V\\d+", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !honor.isEmpty { honors.append(honor) }
         }
         let desc = Self.list(item["DescList"]).map { Self.str($0["Desc"]) }.filter { !$0.isEmpty }
 
@@ -493,6 +499,7 @@ final class QqApi: @unchecked Sendable {
             pic: pic,
             itemId: Self.str(item["ItemID"]),
             wearTexts: wear,
+            honorTexts: honors,
             descTexts: desc,
             praiseNum: Self.int(item["PraiseNum"]),
             isPraised: (item["IsPraised"] as? Bool) ?? false
