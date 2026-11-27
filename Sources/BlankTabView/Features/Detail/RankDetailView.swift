@@ -74,7 +74,7 @@ final class RankDetailModel: ObservableObject {
         var item = RankMember()
         item.position = position
         item.title = "乐迷用户 \(position)"
-        item.wearTexts = position <= 3 ? ["铁粉"] : []
+        item.wearTexts = position <= 3 ? ["NO.5200370"] : []
         item.honorTexts = position <= 3 ? ["SEVENTEEN"] : []
         item.descTexts = ["贡献值 \(1000 - position * 60)"]
         item.praiseNum = 1200 - position * 45
@@ -214,9 +214,10 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 第二行：勋章铭牌（caption 语义字号 + semibold，纯文本、无圆角矩形底色）+ 称号（caption2 + semibold）。
+                // 第二行：铭牌（WearList 的 Content，caption + semibold，纯文本无底色）
+                //        + 称号（WearList 的 Title，caption2 + semibold，圆角矩形包裹）。
                 if !wears.isEmpty || !honors.isEmpty {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    HStack(alignment: .center, spacing: 6) {
                         ForEach(wears, id: \.self) { wear in
                             Text(wear)
                                 .font(.caption.weight(.semibold))
@@ -225,7 +226,13 @@ struct RankMemberRow: View {
                         ForEach(honors, id: \.self) { honor in
                             Text(honor)
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Color(.tertiarySystemFill),
+                                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                )
+                                .lineLimit(1)
                         }
                     }
                     .lineLimit(1)
