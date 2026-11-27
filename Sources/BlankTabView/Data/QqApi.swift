@@ -120,7 +120,10 @@ final class QqApi: @unchecked Sendable {
             if !id.isEmpty { seen.insert(id) }
         }
 
-        let remaining: [[String: Any]] = itemList.filter { !seen.contains(Self.str($0["ItemID"]) }
+        let remaining: [[String: Any]] = itemList.filter { item in
+            let id = Self.str(item["ItemID"])
+            return !seen.contains(id)
+        }
 
         if !remaining.isEmpty {
             let batch = try await cgi(
