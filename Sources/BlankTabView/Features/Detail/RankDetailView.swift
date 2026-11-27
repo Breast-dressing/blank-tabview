@@ -187,6 +187,10 @@ struct RankMemberRow: View {
     private var name: String { item.title.isEmpty ? " " : item.title }
     private var wears: [String] { item.wearTexts.filter { !$0.isEmpty } }
     private var honors: [String] { item.honorTexts.filter { !$0.isEmpty } }
+    /// 称号胶囊高度：始终等于同排铭牌文字的实际高度（随语义字号自动变化）。
+    @State private var plateHeight: CGFloat = 0
+    /// 没有铭牌时的兜底高度：footnote 语义字号的行高。
+    @ScaledMetric(relativeTo: .footnote) private var footnoteHeight: CGFloat = 18
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -215,7 +219,7 @@ struct RankMemberRow: View {
                 }
 
                 // 第二行：称号（WearList 的 Title，caption2 最小说明、默认字重，长条胶囊包裹，
-                //         胶囊高度固定 12pt）在前，铭牌（限定编号 NO.xxxx，caption + semibold，无底色）在后。
+                //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，footnote + semibold，无底色）在后。
                 if !wears.isEmpty || !honors.isEmpty {
                     HStack(alignment: .center, spacing: 6) {
                         ForEach(honors, id: \.self) { honor in
@@ -223,17 +227,25 @@ struct RankMemberRow: View {
                                 .font(.caption2)
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
-                                .frame(height: 12)
+                                .frame(height: plateHeight > 0 ? plateHeight : footnoteHeight)
                                 .background(Color(.tertiarySystemFill), in: Capsule())
                         }
                         ForEach(wears, id: \.self) { wear in
                             Text(wear)
-                                .font(.caption.weight(.semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear.preference(key: PlateHeightKey.self, value: geo.size.height)
+                                    }
+                                )
                         }
                     }
                     .lineLimit(1)
+                    .onPreferenceChange(PlateHeightKey.self) { height in
+                        if height > 0 { plateHeight = height }
+                    }
                 }
 
                 // 第三行：原来的副文案（DescList，caption2 最小说明字号）。
@@ -264,5 +276,12 @@ struct RankMemberRow: View {
 #Preview {
     NavigationStack {
         RankDetailView(memberId: "12345", scheme: "https://i2.y.qq.com/x?a=1", title: "周榜", tabName: "周榜")
+    }
+}
+
+private struct PlateHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
