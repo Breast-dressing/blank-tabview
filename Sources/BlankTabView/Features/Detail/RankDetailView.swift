@@ -202,7 +202,7 @@ struct RankMemberRow: View {
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
             VStack(alignment: .leading, spacing: 3) {
-                // 第一行：成员名字（字号与名次一致：subheadline + bold）。
+                // 第一行：成员名字（iOS 副标题语义字号 subheadline，字重 bold）。
                 HStack(spacing: 6) {
                     Text(name)
                         .font(.subheadline.weight(.bold))
@@ -242,12 +242,13 @@ struct RankMemberRow: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 4) {
+            // 心动数：爱心在上、数字在下方，数字用 caption（说明）语义字号。
+            VStack(spacing: 2) {
                 Image(systemName: item.isPraised ? "heart.fill" : "heart")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(item.isPraised ? Color.red : Color.secondary)
                 Text(item.praiseNum > 0 ? Fmt.compact(item.praiseNum) : " ")
-                    .font(.footnote)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
