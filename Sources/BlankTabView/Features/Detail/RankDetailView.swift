@@ -189,8 +189,8 @@ struct RankMemberRow: View {
     private var honors: [String] { item.honorTexts.filter { !$0.isEmpty } }
     /// 称号胶囊高度：始终等于同排铭牌文字的实际高度（随语义字号自动变化）。
     @State private var plateHeight: CGFloat = 0
-    /// 没有铭牌时的兜底高度：footnote 语义字号的行高。
-    @ScaledMetric(relativeTo: .footnote) private var footnoteHeight: CGFloat = 18
+    /// 没有铭牌时的兜底高度：说明（caption）语义字号的行高，随动态字体缩放。
+    @ScaledMetric(relativeTo: .caption) private var captionHeight: CGFloat = 15
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -219,7 +219,7 @@ struct RankMemberRow: View {
                 }
 
                 // 第二行：称号（WearList 的 Title，caption2 最小说明、默认字重，长条胶囊包裹，
-                //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，footnote + semibold，无底色）在后。
+                //         胶囊高度跟随铭牌文字高度）在前，铭牌（限定编号 NO.xxxx，caption 说明语义 + semibold，无底色）在后。
                 if !wears.isEmpty || !honors.isEmpty {
                     HStack(alignment: .center, spacing: 6) {
                         ForEach(honors, id: \.self) { honor in
@@ -227,12 +227,12 @@ struct RankMemberRow: View {
                                 .font(.caption2)
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
-                                .frame(height: plateHeight > 0 ? plateHeight : footnoteHeight)
+                                .frame(height: plateHeight > 0 ? plateHeight : captionHeight)
                                 .background(Color(.tertiarySystemFill), in: Capsule())
                         }
                         ForEach(wears, id: \.self) { wear in
                             Text(wear)
-                                .font(.footnote.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .background(
