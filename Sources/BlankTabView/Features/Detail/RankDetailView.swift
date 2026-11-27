@@ -181,7 +181,7 @@ struct RankDetailView: View {
     }
 }
 
-/// 榜单行：名次 + 头像 + 名字（铭牌在名字前，原副标题文本在铭牌下面一行）+ 心动数。
+/// 榜单行：第一行成员名字，第二行勋章铭牌，第三行副文案；右侧是心动数。
 struct RankMemberRow: View {
     let item: RankMember
 
@@ -199,12 +199,9 @@ struct RankMemberRow: View {
             // 头像与页面顶部成员信息同尺寸，且不要白边。
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
+                // 第一行：成员名字。
                 HStack(spacing: 6) {
-                    // 勋章铭牌排在成员名字前（WearList 有几段就显示几枚）。
-                    ForEach(wears, id: \.self) { wear in
-                        Plate(text: wear)
-                    }
                     Text(name)
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
@@ -215,7 +212,16 @@ struct RankMemberRow: View {
                     }
                 }
 
-                // 名字下方那行文本保留，落在铭牌下面一行。
+                // 第二行：勋章铭牌（WearList 有几段就显示几枚）。
+                if !wears.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(wears, id: \.self) { wear in
+                            Plate(text: wear)
+                        }
+                    }
+                }
+
+                // 第三行：原来的副文案（DescList）。
                 if !item.descTexts.isEmpty {
                     Text(item.descTexts.joined(separator: " · "))
                         .font(.system(size: 12))
