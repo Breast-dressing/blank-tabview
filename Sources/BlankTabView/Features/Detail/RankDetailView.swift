@@ -173,6 +173,7 @@ struct RankDetailView: View {
             ForEach(0..<8, id: \.self) { _ in
                 RankMemberRow(item: RankMember())
                     .listRowInsets(rowInsets)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                     .listRowBackground(Color.clear)
             }
         } else if let error = model.error {
@@ -188,6 +189,7 @@ struct RankDetailView: View {
             ForEach(Array(detail.items.enumerated()), id: \.offset) { _, item in
                 RankMemberRow(item: item)
                     .listRowInsets(rowInsets)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                     .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture { openedMember = seedMember(for: item) }
@@ -244,10 +246,9 @@ struct RankMemberRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            // 头像贴最左；分隔线让系统从头像右缘起，头像下方不出现分隔线，
-            // 且这个起点只由头像宽度决定，不受名次文本长度影响。
+            // 头像贴最左；分隔线起点由行上固定的头像宽度决定（见 rows 里的 alignmentGuide），
+            // 头像下方因此不出现分隔线，也不受名次文本长度影响。
             AvatarCircle(urlString: item.pic, size: 48, showsRing: false)
-                .alignmentGuide(.listRowSeparatorLeading) { $0.width }
 
             // 名次在头像右侧：与成员名字同一语义字号（subheadline + bold），数字横向居中。
             Text(item.position > 0 ? "\(item.position)" : "–")
