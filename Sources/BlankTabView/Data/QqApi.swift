@@ -471,16 +471,13 @@ final class QqApi: @unchecked Sendable {
         var wear: [String] = []
         var honors: [String] = []
         for entry in Self.list(item["WearList"]) {
-            let contents = Self.list(Self.map(entry["Segment"])["Contents"])
-                .map { Self.str($0["Content"]) }
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !contents.isEmpty { wear.append(contents) }
-            // 称号：WearList.Title 去掉 V6 这类等级后缀后的文本（称号与铭牌同一条目）。
-            let honor = Self.str(entry["Title"])
-                .replacingOccurrences(of: "V\\d+", with: "", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // 铭牌：WearList.Segment.Contents 里每个 Content 单独一条（不拼接）。
+            for content in Self.list(Self.map(entry["Segment"])["Contents"]) {
+                let text = Self.str(content["Content"]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { wear.append(text) }
+            }
+            // 称号：直接取 WearList.Title，不做任何裁剪。
+            let honor = Self.str(entry["Title"]).trimmingCharacters(in: .whitespacesAndNewlines)
             if !honor.isEmpty { honors.append(honor) }
         }
         let desc = Self.list(item["DescList"]).map { Self.str($0["Desc"]) }.filter { !$0.isEmpty }
