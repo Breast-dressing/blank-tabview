@@ -42,9 +42,17 @@ final class RankDetailModel: ObservableObject {
                 MedalTab(name: "总榜", type: 3, id: 3)
             ]
             tab = tabs[0]
-            detail = RankDetail(items: Self.demoMembers)
+            // 演示数据里让第 3 名对应当前成员，便于核对名次数字（0→3）的递增动画。
+            var demo = Self.demoMembers
+            demo[2].itemId = memberId
+            detail = RankDetail(items: demo)
             visibleCount = pageSize
             loading = false
+            // 仅 CI 截图核对：-demoRankNotice 强制展示状态提示（标题 / 正文 / 按钮）。
+            if ProcessInfo.processInfo.arguments.contains("-demoRankNotice") {
+                detail = nil
+                error = "无法连接到榜单服务，请检查网络后重试。"
+            }
             return
         }
         do {
@@ -83,20 +91,23 @@ final class RankDetailModel: ObservableObject {
         loading = false
     }
 
-    /// 切换榜单标签：重新拉该榜的分页数据。
+    /// 切换榜单标签：页面先切过去，数据随后填入。
     func select(_ target: MedalTab) async {
         guard target.id != tab?.id else { return }
         if ProcessInfo.processInfo.arguments.contains("-demoRank") {
             tab = target
             return
         }
+        // 先切页面：标签、榜名立即更新，列表回到加载态，之后再把数据填进来。
+        tab = target
+        detail = nil
+        visibleCount = pageSize
         loading = true
         error = nil
         do {
             let detail = try await services.medals.rankTab(scheme, tab: target)
-            tab = target
             self.detail = detail
-            visibleCount = pageSize
+            self.visibleCount = pageSize
         } catch {
             self.error = error.localizedDescription
         }
@@ -133,6 +144,9 @@ struct RankDetailView: View {
     @State private var openedMember: Member?
     /// 分享图（点工具栏分享按钮后离屏渲染出来，再走系统分享面板）。
     @State private var shareImage: ShareImage?
+    /// 头部名次：切榜后从 0 递增到真实名次（数字变化走系统数字切换动画）。
+    @State private var rankShown = 0
+    @State private var rankAnimation: Task<Void, Never>?
 
     init(memberId: String, scheme: String, title: String, tabName: String) {
         _model = StateObject(
@@ -140,24 +154,29 @@ struct RankDetailView: View {
         )
     }
 
-    private var tabSelection: Binding<Int> {
-        Binding(
-            get: { model.tab?.id ?? model.tabs.first?.id ?? 0 },
-            set: { id in
-                guard let target = model.tabs.first(where: { $0.id == id }) else { return }
-                Task { await model.select(target) }
-            }
-        )
+    /// 工具栏 tab 只显示前三个；第三个标签固定叫「总榜」。
+    private var tabTitles: [String] {
+        Array(model.tabs.prefix(3).enumerated()).map { index, item in
+            index == 2 ? "总榜" : Fmt.cleanTabName(item.name)
+        }
     }
 
-    /// 顶部成员信息里的名次：当前选中成员在该榜的名次。
-    private var myRankText: String {
+    /// 当前选中榜在前三个标签里的下标。
+    private var tabIndex: Int {
+        guard let current = model.tab,
+              let index = model.tabs.firstIndex(where: { $0.id == current.id }) else { return 0 }
+        return min(index, 2)
+    }
+
+    /// 顶部成员信息里的名次：当前选中成员在该榜的名次（取不到时为 nil）。
+    private var myRankValue: Int? {
         let selected = AppServices.shared.store.selectedMemberId ?? model.member.itemId
         guard !selected.isEmpty,
-              let hit = model.detail?.items.first(where: { MemberId.matches($0.itemId, selected) }) else {
-            return "—"
+              let hit = model.detail?.items.first(where: { MemberId.matches($0.itemId, selected) }),
+              hit.position > 0 else {
+            return nil
         }
-        return "\(hit.position)"
+        return hit.position
     }
 
     private var headerSubtitle: String {
@@ -175,7 +194,8 @@ struct RankDetailView: View {
                 title: model.member.title,
                 pic: model.member.pic,
                 subtitle: headerSubtitle,
-                count: myRankText,
+                count: "\(rankShown)",
+                countValue: rankShown,
                 unit: "名",
                 label: "名次"
             )
@@ -197,15 +217,12 @@ struct RankDetailView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if model.tabs.count > 1 {
-                    Picker("排行榜", selection: tabSelection) {
-                        ForEach(Array(model.tabs.prefix(3).enumerated()), id: \.element.id) { index, item in
-                            Text(index == 2 ? "总榜" : Fmt.cleanTabName(item.name)).tag(item.id)
-                        }
+                    RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
+                        guard model.tabs.indices.contains(index) else { return }
+                        let target = model.tabs[index]
+                        Task { await model.select(target) }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .controlSize(.mini)
-                    .frame(maxWidth: 240, maxHeight: 26)
+                    .frame(maxHeight: 30)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -223,6 +240,30 @@ struct RankDetailView: View {
         }
         .task { await model.load() }
         .refreshable { await model.load() }
+        .onChange(of: myRankValue, initial: true) { _, target in
+            animateRank(to: target)
+        }
+    }
+
+    /// 名次从 0 递增到真实名次；每一跳都由系统数字切换动画衔接。
+    private func animateRank(to target: Int?) {
+        rankAnimation?.cancel()
+        guard let target, target > 0 else {
+            withAnimation(.snappy) { rankShown = 0 }
+            return
+        }
+        rankShown = 0
+        rankAnimation = Task { @MainActor in
+            let step = max(1, target / 30)
+            var value = 0
+            while value < target {
+                if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 40_000_000)
+                if Task.isCancelled { return }
+                value = min(target, value + step)
+                withAnimation(.snappy(duration: 0.16)) { rankShown = value }
+            }
+        }
     }
 
     @ViewBuilder
