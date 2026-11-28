@@ -43,12 +43,21 @@ struct RankTabBar: UIViewRepresentable {
         }
     }
 
+    /// 控件只占「各段文本宽度之和」，不被工具栏拉伸。
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
+        CGSize(width: Self.totalWidth(titles: titles), height: 32)
+    }
+
     /// 段宽 = 该标签当前文本的实际排版宽度 + 系统分段自身的左右留白。
     private func applyWidths(to control: UISegmentedControl) {
         for index in 0..<control.numberOfSegments {
             let title = control.titleForSegment(at: index) ?? ""
             control.setWidth(Self.segmentWidth(title: title), forSegmentAt: index)
         }
+    }
+
+    private static func totalWidth(titles: [String]) -> CGFloat {
+        titles.reduce(0) { $0 + segmentWidth(title: $1) }
     }
 
     private static func segmentWidth(title: String) -> CGFloat {
