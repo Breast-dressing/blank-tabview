@@ -13,27 +13,58 @@ final class RankDetailModel: ObservableObject {
     private let wantedTab: String
 
     @Published private(set) var tabs: [MedalTab] = []
+    /// 真榜数据是否已回来（回来后用真实 tab 替换占位标签）。
+    @Published private(set) var tabsReady = false
     /// 列表按页追加：首屏只上 20 行，滚到底再追加下一页。
     @Published private(set) var visibleCount = 20
     let pageSize = 20
     @Published private(set) var tab: MedalTab?
     @Published private(set) var detail: RankDetail?
+    /// 边解析边显示的榜行：解析出来多少就先显示多少。
+    @Published private(set) var items: [RankMember] = []
+    /// 成员信息里的名次：扫描到哪个名次就显示哪个名次，命中本人后停住。
+    @Published private(set) var rankProgress = 0
     @Published private(set) var loading = true
     @Published private(set) var error: String?
     @Published private(set) var member: Member
 
-    init(memberId: String, scheme: String, title: String, tabName: String) {
+    /// 已检索到的本人名次；找到后不再被后续扫描覆盖。
+    private var foundRank: Int?
+
+    init(
+        memberId: String,
+        scheme: String,
+        title: String,
+        tabName: String,
+        weekTabName: String = "",
+        monthTabName: String = ""
+    ) {
         self.memberId = memberId
         self.scheme = scheme
         self.title = title
         self.wantedTab = tabName
         self.member = AppServices.shared.member(memberId)
+
+        // 成员卡片上已经有「周榜 / 月榜」这两个标签，进页面就先把它显示出来，不等榜单数据。
+        let week = Fmt.cleanTabName(weekTabName)
+        let month = Fmt.cleanTabName(monthTabName)
+        let weekLabel = week.isEmpty ? "周榜" : week
+        let monthLabel = month.isEmpty ? "月榜" : month
+        tabs = [
+            MedalTab(name: weekLabel, type: 1, id: 1),
+            MedalTab(name: monthLabel, type: 2, id: 2),
+            MedalTab(name: "总榜", type: 3, id: 3)
+        ]
+        let preferred = tabName.isEmpty ? 0 : (tabs.firstIndex { $0.name.contains(tabName) } ?? 0)
+        tab = tabs[min(max(preferred, 0), tabs.count - 1)]
+        visibleCount = pageSize
     }
 
     /// 首屏：进入时点默认选中的榜。
     func load() async {
         loading = true
         error = nil
+        resetStreaming()
         // 仅 CI 截图核对：-demoRank 直接喂演示数据。
         if ProcessInfo.processInfo.arguments.contains("-demoRank") {
             tabs = [
@@ -41,16 +72,22 @@ final class RankDetailModel: ObservableObject {
                 MedalTab(name: "月榜", type: 2, id: 2),
                 MedalTab(name: "总榜", type: 3, id: 3)
             ]
+            tabsReady = true
             tab = tabs[0]
-            // 演示数据里让第 3 名对应当前成员，便于核对名次数字（0→3）的递增动画。
+            // 演示数据里让第 3 名对应当前成员，便于核对名次数字（0→3）的递增。
             var demo = Self.demoMembers
             demo[2].itemId = memberId
             detail = RankDetail(items: demo)
+            items = demo
+            rankProgress = 3
+            foundRank = 3
             visibleCount = pageSize
             loading = false
             // 仅 CI 截图核对：-demoRankNotice 强制展示状态提示（标题 / 正文 / 按钮）。
             if ProcessInfo.processInfo.arguments.contains("-demoRankNotice") {
                 detail = nil
+                items = []
+                rankProgress = 0
                 error = "无法连接到榜单服务，请检查网络后重试。"
             }
             return
@@ -75,15 +112,22 @@ final class RankDetailModel: ObservableObject {
             }
             index = min(max(index, 0), page.tabs.count - 1)
             tabs = page.tabs
+            tabsReady = true
             let chosen = page.tabs[index]
             tab = chosen
 
             if let cached = page.results.first(where: { $0.tab.id == chosen.id }), cached.success {
                 detail = cached.detail
+                items = cached.detail.items
+                rankProgress = rankOf(cached.detail.items)
+                foundRank = rankProgress > 0 ? rankProgress : nil
+                visibleCount = pageSize
             } else {
-                detail = try await services.medals.rankTab(scheme, tab: chosen)
+                detail = try await services.medals.rankTab(scheme, tab: chosen, onPartial: partialHandler)
+                items = detail?.items ?? items
+                rankProgress = rankOf(detail?.items ?? [])
+                visibleCount = pageSize
             }
-            visibleCount = pageSize
         } catch {
             self.error = error.localizedDescription
             detail = nil
@@ -93,7 +137,7 @@ final class RankDetailModel: ObservableObject {
 
     /// 切换榜单标签：页面先切过去，数据随后填入。
     func select(_ target: MedalTab) async {
-        guard target.id != tab?.id else { return }
+        guard tabsReady, target.id != tab?.id else { return }
         if ProcessInfo.processInfo.arguments.contains("-demoRank") {
             tab = target
             return
@@ -101,12 +145,15 @@ final class RankDetailModel: ObservableObject {
         // 先切页面：标签、榜名立即更新，列表回到加载态，之后再把数据填进来。
         tab = target
         detail = nil
+        resetStreaming()
         visibleCount = pageSize
         loading = true
         error = nil
         do {
-            let detail = try await services.medals.rankTab(scheme, tab: target)
+            let detail = try await services.medals.rankTab(scheme, tab: target, onPartial: partialHandler)
             self.detail = detail
+            self.items = detail.items
+            self.rankProgress = rankOf(detail.items)
             self.visibleCount = pageSize
         } catch {
             self.error = error.localizedDescription
@@ -114,9 +161,44 @@ final class RankDetailModel: ObservableObject {
         loading = false
     }
 
+    /// 解析回调：每解析出一段就先把它显示出来，名次跟着扫描进度走。
+    private var partialHandler: @MainActor @Sendable ([RankMember]) -> Void {
+        { [weak self] partial in
+            self?.showStreaming(partial)
+        }
+    }
+
+    private func showStreaming(_ incoming: [RankMember]) {
+        guard incoming.count >= items.count else { return }
+        items = incoming
+        if let foundRank {
+            rankProgress = foundRank
+            return
+        }
+        if let hit = incoming.first(where: { MemberId.matches($0.itemId, memberId) }) {
+            foundRank = hit.position
+            rankProgress = hit.position
+        } else if let last = incoming.last {
+            rankProgress = last.position
+        }
+    }
+
+    private func resetStreaming() {
+        items = []
+        rankProgress = 0
+        foundRank = nil
+    }
+
+    /// 榜单里当前这位成员的名次；没命中则为 0。
+    private func rankOf(_ list: [RankMember]) -> Int {
+        guard !memberId.isEmpty,
+              let hit = list.first(where: { MemberId.matches($0.itemId, memberId) }) else { return 0 }
+        return hit.position
+    }
+
     /// 滚到接近本页末尾时再追加一页。
     func revealMoreIfNeeded(after item: RankMember) {
-        guard let items = detail?.items, !items.isEmpty else { return }
+        guard !items.isEmpty else { return }
         guard let index = items.firstIndex(where: { $0.itemId == item.itemId && $0.position == item.position }) else { return }
         if index >= visibleCount - 2, visibleCount < items.count {
             visibleCount = min(visibleCount + pageSize, items.count)
@@ -144,13 +226,24 @@ struct RankDetailView: View {
     @State private var openedMember: Member?
     /// 分享图（点工具栏分享按钮后离屏渲染出来，再走系统分享面板）。
     @State private var shareImage: ShareImage?
-    /// 头部名次：切榜后从 0 递增到真实名次（数字变化走系统数字切换动画）。
-    @State private var rankShown = 0
-    @State private var rankAnimation: Task<Void, Never>?
 
-    init(memberId: String, scheme: String, title: String, tabName: String) {
+    init(
+        memberId: String,
+        scheme: String,
+        title: String,
+        tabName: String,
+        weekTabName: String = "",
+        monthTabName: String = ""
+    ) {
         _model = StateObject(
-            wrappedValue: RankDetailModel(memberId: memberId, scheme: scheme, title: title, tabName: tabName)
+            wrappedValue: RankDetailModel(
+                memberId: memberId,
+                scheme: scheme,
+                title: title,
+                tabName: tabName,
+                weekTabName: weekTabName,
+                monthTabName: monthTabName
+            )
         )
     }
 
@@ -168,17 +261,6 @@ struct RankDetailView: View {
         return min(index, 2)
     }
 
-    /// 顶部成员信息里的名次：当前选中成员在该榜的名次（取不到时为 nil）。
-    private var myRankValue: Int? {
-        let selected = AppServices.shared.store.selectedMemberId ?? model.member.itemId
-        guard !selected.isEmpty,
-              let hit = model.detail?.items.first(where: { MemberId.matches($0.itemId, selected) }),
-              hit.position > 0 else {
-            return nil
-        }
-        return hit.position
-    }
-
     private var headerSubtitle: String {
         let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
         let listName = model.tab.map { Fmt.cleanTabName($0.name) } ?? model.title
@@ -194,8 +276,8 @@ struct RankDetailView: View {
                 title: model.member.title,
                 pic: model.member.pic,
                 subtitle: headerSubtitle,
-                count: "\(rankShown)",
-                countValue: rankShown,
+                count: "\(model.rankProgress)",
+                countValue: model.rankProgress,
                 unit: "名",
                 label: "名次"
             )
@@ -240,35 +322,11 @@ struct RankDetailView: View {
         }
         .task { await model.load() }
         .refreshable { await model.load() }
-        .onChange(of: myRankValue, initial: true) { _, target in
-            animateRank(to: target)
-        }
-    }
-
-    /// 名次从 0 递增到真实名次；每一跳都由系统数字切换动画衔接。
-    private func animateRank(to target: Int?) {
-        rankAnimation?.cancel()
-        guard let target, target > 0 else {
-            withAnimation(.snappy) { rankShown = 0 }
-            return
-        }
-        rankShown = 0
-        rankAnimation = Task { @MainActor in
-            let step = max(1, target / 30)
-            var value = 0
-            while value < target {
-                if Task.isCancelled { return }
-                try? await Task.sleep(nanoseconds: 40_000_000)
-                if Task.isCancelled { return }
-                value = min(target, value + step)
-                withAnimation(.snappy(duration: 0.16)) { rankShown = value }
-            }
-        }
     }
 
     @ViewBuilder
     private var rows: some View {
-        if model.loading {
+        if model.loading, model.items.isEmpty {
             // 加载中也复用同一套行，只是喂空数据。
             ForEach(0..<8, id: \.self) { _ in
                 RankMemberRow(item: RankMember())
@@ -283,8 +341,8 @@ struct RankDetailView: View {
             .listRowInsets(rowInsets)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-        } else if let detail = model.detail, !detail.items.isEmpty {
-            ForEach(Array(detail.items.prefix(model.visibleCount).enumerated()), id: \.offset) { _, item in
+        } else if !model.items.isEmpty {
+            ForEach(Array(model.items.prefix(model.visibleCount).enumerated()), id: \.offset) { _, item in
                 RankMemberRow(item: item)
                     .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
@@ -302,7 +360,7 @@ struct RankDetailView: View {
     /// 分享图：用 ImageRenderer 离屏渲染固定宽度的卡片。
     @MainActor
     private func makeShareImage() -> UIImage? {
-        let items = model.detail?.items ?? []
+        let items = model.items
         guard !items.isEmpty else { return nil }
         let card = RankShareCard(
             title: model.title,
