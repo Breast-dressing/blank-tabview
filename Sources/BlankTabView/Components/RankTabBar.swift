@@ -1,15 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// 工具栏分段 tab：桥接系统原生 `UISegmentedControl`（不自绘），
-/// 以便给每个标签单独设宽——第 1 个显示 5 个字、第 2 个 4 个字、第 3 个 2 个字。
+/// 工具栏分段 tab：桥接系统原生 `UISegmentedControl`（不自绘）。
+/// 段宽由系统按标签文本排版宽度决定（不自绘）。
 struct RankTabBar: UIViewRepresentable {
     let titles: [String]
     let selectedIndex: Int
     let onSelect: (Int) -> Void
-
-    /// 每个标签的汉字容量：决定该段的固定宽度。
-    private static let capacities = [5, 4, 2]
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onSelect: onSelect)
@@ -46,18 +43,17 @@ struct RankTabBar: UIViewRepresentable {
         }
     }
 
-    /// 段宽 = 该容量汉字串的实际排版宽度 + 系统分段自身的左右留白。
+    /// 段宽 = 该标签当前文本的实际排版宽度 + 系统分段自身的左右留白。
     private func applyWidths(to control: UISegmentedControl) {
         for index in 0..<control.numberOfSegments {
-            let capacity = Self.capacities.indices.contains(index) ? Self.capacities[index] : 3
-            control.setWidth(Self.segmentWidth(capacity: capacity), forSegmentAt: index)
+            let title = control.titleForSegment(at: index) ?? ""
+            control.setWidth(Self.segmentWidth(title: title), forSegmentAt: index)
         }
     }
 
-    private static func segmentWidth(capacity: Int) -> CGFloat {
+    private static func segmentWidth(title: String) -> CGFloat {
         let font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        let sample = String(repeating: "榜", count: capacity)
-        let textWidth = (sample as NSString).size(withAttributes: [.font: font]).width
+        let textWidth = (title as NSString).size(withAttributes: [.font: font]).width
         return ceil(textWidth) + 24
     }
 

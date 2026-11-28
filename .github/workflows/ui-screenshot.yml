@@ -2,54 +2,50 @@ name: UI Screenshot
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
-  group: ui-screenshot-${{ github.ref }}
+  group: ui-screenshot
   cancel-in-progress: true
 
 jobs:
-  shot:
-    name: simulator screenshots
+  shots:
     runs-on: xcode-27
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build for simulator
+      - name: Boot simulator
         run: |
-          set -euo pipefail
-          sudo xcode-select -s /Applications/Xcode_27.2.app
-          curl -fLsS https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
-          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
-          unzip -oq "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
-          export PATH="$RUNNER_TEMP/xcodegen/bin:$PATH"
-          xcodegen generate
-          xcodebuild build \
-            -project BlankTabView.xcodeproj -scheme BlankTabView \
-            -destination "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2" \
-            -derivedDataPath build/DD CODE_SIGNING_ALLOWED=NO
-
-      - name: Screenshot each tab
-        run: |
-          set -euo pipefail
-          APP=$(find build/DD/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
-          echo "app=$APP"
           xcrun simctl boot "iPhone 18 Pro" || true
-          xcrun simctl bootstatus "iPhone 18 Pro" -b
+          xcrun simctl bootstatus booted -b
+      - name: Build
+        run: |
+          xcodebuild -project BlankTabView.xcodeproj -scheme BlankTabView \
+            -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+            -configuration Release \
+            -derivedDataPath build build 2>&1 | tail -40
+      - name: Install
+        run: |
+          APP=$(find build/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' | head -1)
           xcrun simctl install booted "$APP"
-          xcrun simctl io booted screenshot build/shot-before.png || true
-          for tab in home profile search; do
-            xcrun simctl terminate booted com.breastdressing.blanktabview || true
-            xcrun simctl launch booted com.breastdressing.blanktabview -startTab "$tab" 2>&1 | tee "build/launch-$tab.txt"
-            sleep 9
-            xcrun simctl io booted screenshot "build/shot-$tab.png"
-            echo "shot $tab done"
-          done
+      - name: Shots
+        run: |
+          mkdir -p build
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab home 2>&1 | tee build/launch-home.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-home.png"
+          echo "shot home done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile 2>&1 | tee build/launch-profile.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-profile.png"
+          echo "shot profile done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab search 2>&1 | tee build/launch-search.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-search.png"
+          echo "shot search done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkin 2>&1 | tee build/launch-sheet.txt
           sleep 9
@@ -59,7 +55,7 @@ jobs:
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkinLocked 2>&1 | tee build/launch-skinlocked.txt
           sleep 9
           xcrun simctl io booted screenshot "build/shot-skinlocked.png"
-          echo "shot locked skin done"
+          echo "shot skinlocked done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoSkins 2>&1 | tee build/launch-skins.txt
           sleep 9
@@ -74,7 +70,7 @@ jobs:
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoMedalSheet 2>&1 | tee build/launch-medalsheet.txt
           sleep 9
           xcrun simctl io booted screenshot "build/shot-medalsheet.png"
-          echo "shot medal sheet done"
+          echo "shot medalsheet done"
           xcrun simctl terminate booted com.breastdressing.blanktabview || true
           xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoMedals 2>&1 | tee build/launch-medals.txt
           sleep 9
@@ -85,38 +81,9 @@ jobs:
           sleep 9
           xcrun simctl io booted screenshot "build/shot-rank.png"
           echo "shot rank done"
-          xcrun simctl terminate booted com.breastdressing.blanktabview || true
-          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoRank -demoRankNotice 2>&1 | tee build/launch-ranknotice.txt
-          sleep 9
-          xcrun simctl io booted screenshot "build/shot-ranknotice.png"
-          echo "shot rank notice done"
 
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true
           for f in ~/Library/Logs/DiagnosticReports/*BlankTabView*; do
             [ -f "$f" ] && { echo "--- $f"; head -80 "$f"; }
           done || true
-          ls -l build/shot-*.png build/launch-*.txt
-
-      - name: Upload screenshots
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-screenshots
-          path: |
-            build/shot-*.png
-            build/launch-*.txt
-          retention-days: 7
-
-      - name: Publish screenshots to release
-        if: ${{ always() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release view ui-shots >/dev/null 2>&1 || \
-            gh release create ui-shots --title "UI screenshots" --notes "交付前的模拟器截图。" --latest=false
-          for f in build/shot-*.png build/launch-*.txt; do
-            [ -f "$f" ] && gh release upload ui-shots "$f" --clobber
-          done
-          echo "published"
