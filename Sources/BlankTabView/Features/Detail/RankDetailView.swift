@@ -84,7 +84,6 @@ struct RankDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle(showsArtistTitle ? artistTitle : "")
         .scrollEdgeEffectStyle(.soft, for: .top)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y > Self.headerHeight
@@ -95,14 +94,23 @@ struct RankDetailView: View {
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .principal) {
                 if model.tabs.count > 1 {
-                    RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
-                        guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
-                        let target = model.tabs[index]
-                        Task { await model.select(target) }
+                    // 艺人名放在标题处、tab 的左侧；整块靠右对齐。
+                    HStack(spacing: 10) {
+                        if showsArtistTitle {
+                            Text(artistTitle)
+                                .font(.system(size: 17, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
+                            guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
+                            let target = model.tabs[index]
+                            Task { await model.select(target) }
+                        }
+                        .frame(maxHeight: 30)
                     }
-                    .frame(maxHeight: 30)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
