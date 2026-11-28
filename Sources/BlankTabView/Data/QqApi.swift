@@ -543,3 +543,142 @@ final class QqApi: @unchecked Sendable {
             isPraised: (item["IsPraised"] as? Bool) ?? false
         )
     }
+
+    // MARK: - 勋章详情
+
+    func fetchMedalDetail(url: String, medalId: String, encUin: String = "") async throws -> MedalDetail {
+        var uin = encUin
+        if uin.isEmpty, let ssr = try? await ssrOf(url) {
+            let data = Self.map(ssr["data"])
+            uin = Self.str(data["EncUin"])
+            if uin.isEmpty { uin = Self.str(Self.map(ssr["query"])["enc_uin"]) }
+        }
+
+        let req = try await cgi(
+            "GetMedalDetail",
+            ["MedalID": medalId, "EncUin": uin],
+            "music.medalHall.MedalHallHomepageSrv",
+            "GetMedalDetail"
+        )
+        let code = Self.int(req["code"])
+        if code != 0 {
+            let message = Self.str(req["msg"])
+            throw ApiError(message.isEmpty ? "勋章详情加载失败（code=\(code)）" : message, code: code)
+        }
+        let data = Self.map(req["data"])
+        let resolvedId = Self.str(data["MedalID"])
+        return MedalDetail(
+            medalId: resolvedId.isEmpty ? medalId : resolvedId,
+            scheme: Self.str(data["Scheme"]),
+            levels: extractLevels(data),
+            fan: parseFan(data)
+        )
+    }
+
+    func extractLevels(_ data: [String: Any]) -> [MedalLevel] {
+        let candidates = [
+            Self.list(Self.map(data["OldMedalDetail"])["MedalList"]),
+            Self.list(Self.map(data["FanMedalDetail"])["MedalList"]),
+            Self.list(data["MedalList"])
+        ]
+        for list in candidates where !list.isEmpty {
+            return list.map { item in
+                let name = Self.str(item["Name"])
+                return MedalLevel(
+                    level: Self.int(item["Level"]),
+                    state: Self.int(item["State"]),
+                    name: name.isEmpty ? "未命名" : name,
+                    picUrl: Self.str(item["PicURL"]),
+                    medalId: Self.str(item["MedalID"]),
+                    createTime: Self.str(item["CreateTime"])
+                )
+            }
+        }
+
+        let center = Self.list(Self.map(Self.map(data["FanMedalDetail"])["Center"])["ItemList"])
+        if !center.isEmpty {
+            return center.map { item in
+                let section = Self.map(item["Section"])
+                let corner = Self.map(item["Corner"])
+                let sectionText = Self.str(section["Section"])
+                let level = Int(sectionText.replacingOccurrences(of: "^", with: "", options: .regularExpression))
+                    ?? Int(sectionText.replacingOccurrences(of: "V", with: ""))
+                    ?? 0
+                let owned = Self.str(corner["Desc"]) == "获得"
+                return MedalLevel(
+                    level: level,
+                    state: owned ? 2 : 1,
+                    name: Self.str(section["Alias"]),
+                    picUrl: Self.str(section["PicURL"]),
+                    medalId: "center_\(sectionText)",
+                    createTime: owned ? Self.str(corner["Title"]) : "",
+                    sectionText: sectionText,
+                    isCenter: true
+                )
+            }
+        }
+        return []
+    }
+
+    func parseFan(_ data: [String: Any]) -> FanMedal? {
+        let fan = Self.map(data["FanMedalDetail"])
+        if fan.isEmpty { return nil }
+        let section = Self.map(fan["Section"])
+        let corner = Self.map(fan["Corner"])
+        let proportion = Self.map(fan["Proportion"])
+        return FanMedal(
+            name: Self.str(fan["Name"]),
+            pic: Self.str(fan["PicURL"]),
+            levelText: Self.str(section["Section"]),
+            alias: Self.str(section["Alias"]),
+            rankTitle: Self.str(corner["Title"]),
+            rankDesc: Self.str(corner["Desc"]),
+            current: Self.int(proportion["Current"]),
+            upper: Self.int(proportion["UpperLimit"])
+        )
+    }
+
+    // MARK: - 皮肤
+
+    func fetchSkinShowList(medalId: String, encUin: String = "", cursor: String = "", pageSize: Int = 4) async throws -> SkinShowList {
+        let req = try await cgi(
+            "GetSkinShowList",
+            ["MedalID": medalId, "ShowPos": 1, "PageSize": pageSize, "Cursor": cursor, "EncUin": encUin],
+            "music.medalSkin.MedalSkinHomepageSrv",
+            "GetSkinShowList"
+        )
+
+        let data = Self.map(req["data"])
+        let hasPayload = Self.int(data["SkinTotal"]) > 0
+            || !Self.list(data["SkinList"]).isEmpty
+            || !Self.str(data["MedalName"]).isEmpty
+        let code = Self.int(req["code"])
+        if code != 0 && !hasPayload {
+            let message = Self.str(req["msg"])
+            throw ApiError(message.isEmpty ? "皮肤数据获取失败（code=\(code)）" : message, code: code)
+        }
+
+        return SkinShowList(
+            total: Self.int(data["SkinTotal"]),
+            skins: Self.list(data["SkinList"]).map(parseSkinShowItem),
+            medalName: Self.str(data["MedalName"]),
+            hasMore: (data["HasMore"] as? Bool) ?? false,
+            nextCursor: Self.str(data["NextCursor"])
+        )
+    }
+
+    private func parseSkinShowItem(_ skin: [String: Any]) -> SkinItem {
+        let unlockedTs = Self.int(skin["UnlockedTs"])
+        let name = Self.str(skin["Name"])
+        return SkinItem(
+            id: Self.str(skin["ID"]),
+            seq: Self.int(skin["Seq"]),
+            name: name.isEmpty ? "无皮肤" : pic("无皮肤"),
+            pic: Self.str(skin["Pic"]),
+            categId: Self.str(skin["CategID"]),
+            seqNo: Self.str(skin["SeqNo"]),
+            userCount: Self.int(skin["UnlockedUserCnt"]),
+            isUnlocked: unlockedTs > 0,
+            stateText: unlockedTs > 0 ? "已解锁" : "未解锁"
+        )
+    }
