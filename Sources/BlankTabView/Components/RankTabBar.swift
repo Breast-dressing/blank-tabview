@@ -43,9 +43,9 @@ struct RankTabBar: UIViewRepresentable {
         }
     }
 
-    /// 控件只占「各段文本宽度之和」，不被工具栏拉伸。
+    /// 控件只占「各段文本宽度之和」，高度沿用系统默认按钮高度（不自定义）。
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
-        CGSize(width: Self.totalWidth(titles: titles), height: 32)
+        CGSize(width: Self.totalWidth(titles: titles), height: uiView.intrinsicContentSize.height)
     }
 
     /// 段宽 = 该标签当前文本的实际排版宽度 + 系统分段自身的左右留白。
