@@ -121,8 +121,13 @@ final class MedalRepository: @unchecked Sendable {
         }
     }
 
-    func rankTab(_ url: String, tab: MedalTab) async throws -> RankDetail {
-        try await api.fetchRankTab(url: url, tab: tab)
+    /// 拉单个榜；`onPartial` 每解析出一段就回调一次，界面边解析边显示。
+    func rankTab(
+        _ url: String,
+        tab: MedalTab,
+        onPartial: (@MainActor @Sendable ([RankMember]) -> Void)? = nil
+    ) async throws -> RankDetail {
+        try await api.fetchRankTab(url: url, tab: tab, onPartial: onPartial)
     }
 
     // MARK: - 勋章详情
