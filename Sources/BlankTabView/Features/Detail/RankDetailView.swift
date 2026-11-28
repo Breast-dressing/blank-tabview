@@ -6,8 +6,6 @@ struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
     /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
     @State private var openedMember: Member?
-    /// 分享图（点工具栏分享按钮后离屏渲染出来，再走系统分享面板）。
-    @State private var shareImage: ShareImage?
 
     init(
         memberId: String,
@@ -29,18 +27,22 @@ struct RankDetailView: View {
         )
     }
 
-    /// 工具栏 tab 只显示前三个；第三个标签固定叫「总榜」。
+    /// 工具栏 tab 显示全部榜单；第三个标签固定叫「乐迷总榜」，第四个固定叫「家族总榜」。
     private var tabTitles: [String] {
-        Array(model.tabs.prefix(3).enumerated()).map { index, item in
-            index == 2 ? "总榜" : Fmt.cleanTabName(item.name)
+        Array(model.tabs.enumerated()).map { index, item in
+            switch index {
+            case 2: return "乐迷总榜"
+            case 3: return "家族总榜"
+            default: return Fmt.cleanTabName(item.name)
+            }
         }
     }
 
-    /// 当前选中榜在前三个标签里的下标。
+    /// 当前选中榜在标签列表里的下标。
     private var tabIndex: Int {
         guard let current = model.tab,
               let index = model.tabs.firstIndex(where: { $0.id == current.id }) else { return 0 }
-        return min(index, 2)
+        return index
     }
 
     private var headerSubtitle: String {
@@ -89,18 +91,6 @@ struct RankDetailView: View {
                     .frame(maxHeight: 30)
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    guard let image = makeShareImage() else { return }
-                    shareImage = ShareImage(image: image)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel("分享榜单")
-            }
-        }
-        .sheet(item: $shareImage) { payload in
-            ShareSheet(items: [payload.image])
         }
         .task { await model.load() }
         .refreshable { await model.load() }
@@ -123,22 +113,6 @@ struct RankDetailView: View {
                     .onTapGesture { openedMember = seedMember(for: item) }
             }
         }
-    }
-
-    /// 分享图：用 ImageRenderer 离屏渲染固定宽度的卡片。
-    @MainActor
-    private func makeShareImage() -> UIImage? {
-        let items = model.items
-        guard !items.isEmpty else { return nil }
-        let card = RankShareCard(
-            title: model.title,
-            subtitle: headerSubtitle,
-            members: items,
-            ownerName: model.member.title
-        )
-        let renderer = ImageRenderer(content: card)
-        renderer.scale = 3
-        return renderer.uiImage
     }
 
     /// 用榜行数据做成员卡片入参，避免陌生成员落到「用户」占位。
