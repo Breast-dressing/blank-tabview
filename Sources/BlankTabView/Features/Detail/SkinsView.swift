@@ -157,6 +157,11 @@ struct SkinsView: View {
     @State private var pendingSeries: ProfileDestination?
     /// 刚关掉弹窗的 0.4 秒内不接收新的点击，避免关闭动画中再开另一个弹窗。
     @State private var dismissLock = false
+    /// 长按系列卡片的「编辑名字 / 隐藏系列」，只作用于本页显示。
+    @State private var renamedSeries: [String: String] = [:]
+    @State private var hiddenSeries: Set<String> = []
+    @State private var editingSeriesName: String?
+    @State private var editDraft = ""
     @Namespace private var zoomNS
 
     init(memberId: String, medalId: String, medalName: String, scheme: String) {
@@ -183,9 +188,9 @@ struct SkinsView: View {
                     }
                 }
             } else {
-                ForEach(model.groups) { group in
+                ForEach(model.groups.filter { !hiddenSeries.contains($0.name) }) { group in
                     DetailSeriesCard(
-                        title: group.name,
+                        title: seriesTitle(for: group),
                         trailing: "已收集 \(group.unlockedCount)/\(group.skins.count)",
                         onTrailingTap: { pendingSeries = route(for: group) }
                     ) {
@@ -193,6 +198,20 @@ struct SkinsView: View {
                             guard !dismissLock else { return }
                             selectedSeries = group.name
                             selectedSkin = skin
+                        }
+                    }
+                    // 长按出系统原生选项菜单（二级菜单，不自绘）。
+                    .contextMenu {
+                        Button {
+                            editDraft = seriesTitle(for: group)
+                            editingSeriesName = group.name
+                        } label: {
+                            Text("编辑名字")
+                        }
+                        Button(role: .destructive) {
+                            hiddenSeries.insert(group.name)
+                        } label: {
+                            Text("隐藏系列")
                         }
                     }
                 }
@@ -218,6 +237,25 @@ struct SkinsView: View {
                 zoomNamespace: zoomNS
             )
         }
+        .alert("编辑名字", isPresented: Binding(
+            get: { editingSeriesName != nil },
+            set: { if !$0 { editingSeriesName = nil } }
+        )) {
+            TextField("系列名字", text: $editDraft)
+            Button("取消", role: .cancel) { editingSeriesName = nil }
+            Button("保存") {
+                if let key = editingSeriesName {
+                    renamedSeries[key] = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                editingSeriesName = nil
+            }
+        }
+    }
+
+    /// 系列显示名：本地改过名字就用改后的名字。
+    private func seriesTitle(for group: SkinSeriesGroup) -> String {
+        let custom = renamedSeries[group.name] ?? ""
+        return custom.isEmpty ? group.name : custom
     }
 
     static func placeholderSkins(ns: Int) -> [SkinItem] {
