@@ -80,14 +80,16 @@ struct RankDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if model.tabs.count > 1 {
-                    // 靠右显示：放在工具栏右侧位（标题位会被系统居中，无法靠右）。
                     RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
                         guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
                         let target = model.tabs[index]
                         Task { await model.select(target) }
                     }
+                    // 顶到工具栏最右侧（去掉系统默认的尾部留白）。
+                    .padding(.trailing, -16)
                 }
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .task { await model.load() }
         .refreshable { await model.load() }
