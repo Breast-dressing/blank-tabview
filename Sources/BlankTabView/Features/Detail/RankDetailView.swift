@@ -80,14 +80,16 @@ struct RankDetailView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if model.tabs.count > 1 {
-                    RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
-                        guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
-                        let target = model.tabs[index]
-                        Task { await model.select(target) }
+                    // 标题区靠右显示：用弹性 Spacer 把 tab 推到标题区最右侧，高度用系统默认。
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
+                            guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
+                            let target = model.tabs[index]
+                            Task { await model.select(target) }
+                        }
                     }
-                    .frame(maxHeight: 30)
-                    // 标题处靠右显示：整条占满标题区，内容对齐到尾部。
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
