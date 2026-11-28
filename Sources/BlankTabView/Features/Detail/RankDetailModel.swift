@@ -55,7 +55,8 @@ final class RankDetailModel: ObservableObject {
         tabs = [
             MedalTab(name: weekLabel, type: 1, id: 1),
             MedalTab(name: monthLabel, type: 2, id: 2),
-            MedalTab(name: "总榜", type: 3, id: 3)
+            MedalTab(name: "乐迷总榜", type: 3, id: 3),
+            MedalTab(name: "家族总榜", type: 4, id: 4)
         ]
         let preferred = tabName.isEmpty ? 0 : (tabs.firstIndex { $0.name.contains(tabName) } ?? 0)
         tab = tabs[min(max(preferred, 0), tabs.count - 1)]
@@ -72,7 +73,8 @@ final class RankDetailModel: ObservableObject {
             tabs = [
                 MedalTab(name: "周榜", type: 1, id: 1),
                 MedalTab(name: "月榜", type: 2, id: 2),
-                MedalTab(name: "总榜", type: 3, id: 3)
+                MedalTab(name: "乐迷总榜", type: 3, id: 3),
+                MedalTab(name: "家族总榜", type: 4, id: 4)
             ]
             tabsReady = true
             tab = tabs[0]
