@@ -85,6 +85,11 @@ jobs:
           sleep 9
           xcrun simctl io booted screenshot "build/shot-rank.png"
           echo "shot rank done"
+          xcrun simctl terminate booted com.breastdressing.blanktabview || true
+          xcrun simctl launch booted com.breastdressing.blanktabview -startTab profile -demoRank -demoRankNotice 2>&1 | tee build/launch-ranknotice.txt
+          sleep 9
+          xcrun simctl io booted screenshot "build/shot-ranknotice.png"
+          echo "shot rank notice done"
 
           echo "== crash reports =="
           ls -lt ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5 || true
