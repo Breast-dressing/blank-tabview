@@ -5,6 +5,8 @@ struct MemberSectionHeader: View {
     let pic: String
     let subtitle: String
     let count: String
+    /// 需要数字滚动动画时传数值：走系统 `contentTransition(.numericText)`。
+    var countValue: Int? = nil
     var unit: String = ""
     var label: String = "已获得"
 
@@ -28,8 +30,14 @@ struct MemberSectionHeader: View {
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     // 上榜人数：iOS 三级标题（title3）语义字号，字重保持 bold。
-                    Text(count)
-                        .font(.title3.weight(.bold))
+                    if let countValue {
+                        Text("\(countValue)")
+                            .font(.title3.weight(.bold))
+                            .contentTransition(.numericText(value: Double(countValue)))
+                    } else {
+                        Text(count)
+                            .font(.title3.weight(.bold))
+                    }
                     if !unit.isEmpty {
                         Text(unit)
                             .font(.footnote)
