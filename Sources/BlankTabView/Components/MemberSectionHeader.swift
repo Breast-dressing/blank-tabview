@@ -34,6 +34,7 @@ struct MemberSectionHeader: View {
                         Text("\(countValue)")
                             .font(.title3.weight(.bold))
                             .contentTransition(.numericText(value: Double(countValue)))
+                            .animation(.snappy(duration: 0.25), value: countValue)
                     } else {
                         Text(count)
                             .font(.title3.weight(.bold))

@@ -57,8 +57,15 @@ struct ProfilePage: View {
     @ViewBuilder
     private func destination(for route: ProfileDestination) -> some View {
         switch route {
-        case let .rank(memberId, scheme, title, tabName):
-            RankDetailView(memberId: memberId, scheme: scheme, title: title, tabName: tabName)
+        case let .rank(memberId, scheme, title, tabName, weekTabName, monthTabName):
+            RankDetailView(
+                memberId: memberId,
+                scheme: scheme,
+                title: title,
+                tabName: tabName,
+                weekTabName: weekTabName,
+                monthTabName: monthTabName
+            )
         case let .medalHall(memberId):
             MedalsHallView(memberId: memberId)
         case let .medalModule(memberId, moduleId, moduleName, tabName):
