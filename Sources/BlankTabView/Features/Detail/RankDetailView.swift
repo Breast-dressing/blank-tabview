@@ -6,11 +6,6 @@ struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
     /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
     @State private var openedMember: Member?
-    /// 成员信息被工具栏完全遮挡后，标题处改显艺人名字。
-    @State private var showsArtistTitle = false
-
-    /// 成员信息整行的实际高度（工具栏遮挡判定的阈值）。
-    private static let headerHeight: CGFloat = 56
 
     init(
         memberId: String,
@@ -46,12 +41,6 @@ struct RankDetailView: View {
         return min(index, 2)
     }
 
-    /// 工具栏标题：榜单对应艺人名字。
-    private var artistTitle: String {
-        let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return artist.isEmpty ? model.title : artist
-    }
-
     private var headerSubtitle: String {
         let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
         let listName = model.tab.map { Fmt.cleanTabName($0.name) } ?? model.title
@@ -85,31 +74,19 @@ struct RankDetailView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y > Self.headerHeight
-        } action: { _, collapsed in
-            showsArtistTitle = collapsed
-        }
         .navigationDestination(item: $openedMember) { member in
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if model.tabs.count > 1 {
-                    // 艺人名放在标题处、tab 的左侧；整块靠右对齐。
-                    HStack(spacing: 10) {
-                        if showsArtistTitle {
-                            Text(artistTitle)
-                                .font(.system(size: 17, weight: .semibold))
-                                .lineLimit(1)
-                        }
-                        RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
-                            guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
-                            let target = model.tabs[index]
-                            Task { await model.select(target) }
-                        }
-                        .frame(maxHeight: 30)
+                    RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
+                        guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
+                        let target = model.tabs[index]
+                        Task { await model.select(target) }
                     }
+                    .frame(maxHeight: 30)
+                    // 标题处靠右显示：整条占满标题区，内容对齐到尾部。
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
