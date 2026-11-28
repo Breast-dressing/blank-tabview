@@ -6,6 +6,11 @@ struct RankDetailView: View {
     @StateObject private var model: RankDetailModel
     /// 点榜单成员 → 该成员的「已获得奖章」；响应里的 ItemID 与家族成员 ID 同源。
     @State private var openedMember: Member?
+    /// 成员信息被工具栏完全遮挡后，标题处改显艺人名字。
+    @State private var showsArtistTitle = false
+
+    /// 成员信息整行的实际高度（工具栏遮挡判定的阈值）。
+    private static let headerHeight: CGFloat = 56
 
     init(
         memberId: String,
@@ -27,22 +32,24 @@ struct RankDetailView: View {
         )
     }
 
-    /// 工具栏 tab 显示全部榜单；第三个标签固定叫「乐迷总榜」，第四个固定叫「家族总榜」。
+    /// 工具栏 tab 只显示前三个；第三个标签固定叫「总榜」。
     private var tabTitles: [String] {
-        Array(model.tabs.enumerated()).map { index, item in
-            switch index {
-            case 2: return "乐迷总榜"
-            case 3: return "家族总榜"
-            default: return Fmt.cleanTabName(item.name)
-            }
+        Array(model.tabs.prefix(3).enumerated()).map { index, item in
+            index == 2 ? "总榜" : Fmt.cleanTabName(item.name)
         }
     }
 
-    /// 当前选中榜在标签列表里的下标。
+    /// 当前选中榜在前三个标签里的下标。
     private var tabIndex: Int {
         guard let current = model.tab,
               let index = model.tabs.firstIndex(where: { $0.id == current.id }) else { return 0 }
-        return index
+        return min(index, 2)
+    }
+
+    /// 工具栏标题：榜单对应艺人名字。
+    private var artistTitle: String {
+        let artist = model.member.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return artist.isEmpty ? model.title : artist
     }
 
     private var headerSubtitle: String {
@@ -77,14 +84,21 @@ struct RankDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(showsArtistTitle ? artistTitle : "")
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > Self.headerHeight
+        } action: { _, collapsed in
+            showsArtistTitle = collapsed
+        }
         .navigationDestination(item: $openedMember) { member in
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if model.tabs.count > 1 {
                     RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
-                        guard model.tabs.indices.contains(index) else { return }
+                        guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
                         let target = model.tabs[index]
                         Task { await model.select(target) }
                     }
