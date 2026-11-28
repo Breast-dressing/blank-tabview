@@ -1,7 +1,6 @@
-import Foundation
 import SwiftUI
 
-/// 「我的」页与成员详情共用的四个入口：可点条件与目标页统一在这里，避免两处各写一套。
+/// 我的页可跳转的详情页入口构造。
 enum MemberEntries {
     /// 周榜 / 月榜：需要榜单链接，且对应排名已拿到。
     static func rank(_ metrics: MemberMetrics, monthly: Bool) -> ProfileDestination? {
@@ -12,7 +11,9 @@ enum MemberEntries {
             memberId: metrics.member.itemId,
             scheme: metrics.rankScheme,
             title: monthly ? metrics.monthTitle : metrics.weekTitle,
-            tabName: monthly ? metrics.monthTabName : metrics.weekTabName
+            tabName: monthly ? metrics.monthTabName : metrics.weekTabName,
+            weekTabName: metrics.weekTabName,
+            monthTabName: metrics.monthTabName
         )
     }
 
