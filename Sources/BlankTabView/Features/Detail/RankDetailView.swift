@@ -78,18 +78,14 @@ struct RankDetailView: View {
             MedalsHallView(memberId: member.itemId, seedMember: member)
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if model.tabs.count > 1 {
-                    // 标题区靠右显示：用弹性 Spacer 把 tab 推到标题区最右侧，高度用系统默认。
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
-                            guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
-                            let target = model.tabs[index]
-                            Task { await model.select(target) }
-                        }
+                    // 靠右显示：放在工具栏右侧位（标题位会被系统居中，无法靠右）。
+                    RankTabBar(titles: tabTitles, selectedIndex: tabIndex) { index in
+                        guard tabTitles.indices.contains(index), model.tabs.indices.contains(index) else { return }
+                        let target = model.tabs[index]
+                        Task { await model.select(target) }
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
