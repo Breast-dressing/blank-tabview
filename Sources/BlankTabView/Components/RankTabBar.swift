@@ -48,7 +48,7 @@ struct RankTabBar: UIViewRepresentable {
         CGSize(width: Self.totalWidth(titles: titles), height: uiView.intrinsicContentSize.height)
     }
 
-    /// 段宽 = 该标签当前文本的实际排版宽度 + 系统分段自身的左右留白。
+    /// 段宽 = 该标签文本排版宽度 + 很小的左右内边距，让文字贴近按钮背景边缘。
     private func applyWidths(to control: UISegmentedControl) {
         for index in 0..<control.numberOfSegments {
             let title = control.titleForSegment(at: index) ?? ""
@@ -60,10 +60,13 @@ struct RankTabBar: UIViewRepresentable {
         titles.reduce(0) { $0 + segmentWidth(title: $1) }
     }
 
+    /// 单侧内边距：4pt（原来是 12pt，文字离胶囊边缘太远）。
+    private static let horizontalPadding: CGFloat = 4
+
     private static func segmentWidth(title: String) -> CGFloat {
         let font = UIFont.systemFont(ofSize: 13, weight: .semibold)
         let textWidth = (title as NSString).size(withAttributes: [.font: font]).width
-        return ceil(textWidth) + 24
+        return ceil(textWidth) + horizontalPadding * 2
     }
 
     private var clampedIndex: Int {
