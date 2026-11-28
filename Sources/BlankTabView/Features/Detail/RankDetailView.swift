@@ -27,18 +27,22 @@ struct RankDetailView: View {
         )
     }
 
-    /// 工具栏 tab 只显示前三个；第三个标签固定叫「总榜」。
+    /// 工具栏 tab 不限数量；第三个固定「总榜」，第四个固定「家族」。
     private var tabTitles: [String] {
-        Array(model.tabs.prefix(3).enumerated()).map { index, item in
-            index == 2 ? "总榜" : Fmt.cleanTabName(item.name)
+        Array(model.tabs.enumerated()).map { index, item in
+            switch index {
+            case 2: return "总榜"
+            case 3: return "家族"
+            default: return Fmt.cleanTabName(item.name)
+            }
         }
     }
 
-    /// 当前选中榜在前三个标签里的下标。
+    /// 当前选中榜在工具栏标签里的下标。
     private var tabIndex: Int {
         guard let current = model.tab,
               let index = model.tabs.firstIndex(where: { $0.id == current.id }) else { return 0 }
-        return min(index, 2)
+        return min(index, max(tabTitles.count - 1, 0))
     }
 
     private var headerSubtitle: String {
@@ -88,6 +92,8 @@ struct RankDetailView: View {
                     }
                 }
             }
+            // 去掉工具栏默认添加的液态玻璃背景。
+            .sharedBackgroundVisibility(.hidden)
         }
         .task { await model.load() }
         .refreshable { await model.load() }
